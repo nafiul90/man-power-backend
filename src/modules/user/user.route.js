@@ -2,6 +2,7 @@ const express = require('express');
 const controller = require('./user.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
 const validate = require('../../middleware/validate.middleware');
+const { sendError } = require('../../utils/response');
 const {
   loginValidator,
   createUserValidator,
@@ -11,6 +12,14 @@ const {
 } = require('./user.validator');
 
 const router = express.Router();
+
+// Prevent Org Owner from creating/assigning Super Admin role
+const restrictSuperAdminRole = (req, res, next) => {
+  if (req.user.role === 'Org Owner' && req.body.role === 'Super Admin') {
+    return sendError(res, 403, 'Org Owner cannot assign the Super Admin role.');
+  }
+  next();
+};
 
 // Public
 router.post('/login', loginValidator, validate, controller.login);
@@ -24,9 +33,9 @@ router.patch('/me/change-password', authenticate, changeOwnPasswordValidator, va
 const adminRoles = ['Super Admin', 'Org Owner', 'Manager'];
 
 router.get('/', authenticate, authorize(...adminRoles), controller.getAllUsers);
-router.post('/', authenticate, authorize('Super Admin', 'Org Owner'), createUserValidator, validate, controller.createUser);
+router.post('/', authenticate, authorize('Super Admin', 'Org Owner'), restrictSuperAdminRole, createUserValidator, validate, controller.createUser);
 router.get('/:id', authenticate, authorize(...adminRoles), controller.getUserById);
-router.put('/:id', authenticate, authorize('Super Admin', 'Org Owner'), updateUserValidator, validate, controller.updateUser);
+router.put('/:id', authenticate, authorize('Super Admin', 'Org Owner'), restrictSuperAdminRole, updateUserValidator, validate, controller.updateUser);
 router.patch('/:id/change-password', authenticate, authorize('Super Admin', 'Org Owner'), changePasswordValidator, validate, controller.changeUserPassword);
 router.delete('/:id', authenticate, authorize('Super Admin'), controller.deleteUser);
 
