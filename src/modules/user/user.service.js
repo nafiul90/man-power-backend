@@ -1,4 +1,5 @@
 const User = require('./user.model');
+const Group = require('../group/group.model');
 const { generateToken } = require('../../utils/jwt');
 const { buildOrgFilter } = require('../../utils/scope');
 
@@ -47,15 +48,23 @@ const getUserById = async (id, reqUser) => {
 };
 
 const createUser = async (reqUser, data) => {
-  // Assign requesting user's org automatically (unless Super Admin explicitly provides one)
   const org = reqUser.role === 'Super Admin' ? (data.org || null) : (reqUser.org || null);
-  const user = await User.create({ ...data, org });
+  const { groupId, ...userData } = data;
+  const user = await User.create({ ...userData, org });
+
+  if (groupId) {
+    await Group.findOneAndUpdate(
+      { _id: groupId, org: user.org },
+      { $addToSet: { members: user._id } }
+    );
+  }
+
   return user;
 };
 
 const updateUser = async (id, reqUser, data) => {
   const orgFilter = buildOrgFilter(reqUser);
-  const allowedData = { ...data };
+  const { groupId, ...allowedData } = data;
   if (reqUser.role !== 'Super Admin') delete allowedData.org;
 
   const user = await User.findOneAndUpdate(
@@ -64,6 +73,17 @@ const updateUser = async (id, reqUser, data) => {
     { new: true, runValidators: true }
   );
   if (!user) throw { statusCode: 404, message: 'User not found.' };
+
+  if (groupId !== undefined) {
+    await Group.updateMany({ members: id, org: user.org }, { $pull: { members: id } });
+    if (groupId) {
+      await Group.findOneAndUpdate(
+        { _id: groupId, org: user.org },
+        { $addToSet: { members: id } }
+      );
+    }
+  }
+
   return user;
 };
 

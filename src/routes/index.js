@@ -5,6 +5,10 @@ const categoryRoutes = require('../modules/category/category.route');
 const adminAreaRoutes = require('../modules/adminArea/adminArea.route');
 const zoneRoutes = require('../modules/zone/zone.route');
 const groupRoutes = require('../modules/group/group.route');
+const trainingRoutes = require('../modules/training/training.route');
+const groupTrainingRoutes = require('../modules/groupTraining/groupTraining.route');
+const memberTrainingRoutes = require('../modules/memberTraining/memberTraining.route');
+const certificateRoutes = require('../modules/certificate/certificate.route');
 
 const router = express.Router();
 
@@ -14,5 +18,9 @@ router.use('/categories', categoryRoutes);
 router.use('/admin-areas', adminAreaRoutes);
 router.use('/zones', zoneRoutes);
 router.use('/groups', groupRoutes);
+router.use('/trainings', trainingRoutes);
+router.use('/group-trainings', groupTrainingRoutes);
+router.use('/member-trainings', memberTrainingRoutes);
+router.use('/certificates', certificateRoutes);
 
 module.exports = router;
