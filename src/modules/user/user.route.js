@@ -31,10 +31,12 @@ router.patch('/me/change-password', authenticate, changeOwnPasswordValidator, va
 
 // Admin routes
 const adminRoles = ['Super Admin', 'Org Owner', 'Manager'];
+const readRoles = [...adminRoles, 'Instructor'];
 
-router.get('/', authenticate, authorize(...adminRoles), controller.getAllUsers);
+router.get('/', authenticate, authorize(...readRoles), controller.getAllUsers);
 router.post('/', authenticate, authorize('Super Admin', 'Org Owner'), restrictSuperAdminRole, createUserValidator, validate, controller.createUser);
-router.get('/:id', authenticate, authorize(...adminRoles), controller.getUserById);
+router.get('/:id/stats', authenticate, authorize(...adminRoles, 'Instructor'), controller.getMemberStats);
+router.get('/:id', authenticate, authorize(...adminRoles, 'Instructor'), controller.getUserById);
 router.put('/:id', authenticate, authorize('Super Admin', 'Org Owner'), restrictSuperAdminRole, updateUserValidator, validate, controller.updateUser);
 router.patch('/:id/change-password', authenticate, authorize('Super Admin', 'Org Owner'), changePasswordValidator, validate, controller.changeUserPassword);
 router.delete('/:id', authenticate, authorize('Super Admin'), controller.deleteUser);

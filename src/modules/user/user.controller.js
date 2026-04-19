@@ -68,7 +68,15 @@ const deleteUser = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const getMemberStats = async (req, res, next) => {
+  try {
+    const stats = await userService.getMemberStats(req.params.id, req.user);
+    return sendSuccess(res, 200, 'Member stats fetched.', stats);
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   login, getMe, updateProfile, changeOwnPassword,
   getAllUsers, getUserById, createUser, updateUser, changeUserPassword, deleteUser,
+  getMemberStats,
 };

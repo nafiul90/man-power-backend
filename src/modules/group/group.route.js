@@ -13,14 +13,15 @@ const groupValidator = [
   body('members').optional().isArray().withMessage('Members must be an array.'),
 ];
 
-const allowedRoles = ['Super Admin', 'Org Owner'];
+const writeRoles = ['Super Admin', 'Org Owner'];
+const readRoles = [...writeRoles, 'Manager', 'Instructor'];
 
-router.use(authenticate, authorize(...allowedRoles));
+router.use(authenticate);
 
-router.get('/', controller.getAll);
-router.post('/', groupValidator, validate, controller.create);
-router.get('/:id', controller.getById);
-router.put('/:id', groupValidator, validate, controller.update);
-router.delete('/:id', controller.remove);
+router.get('/', authorize(...readRoles), controller.getAll);
+router.post('/', authorize(...writeRoles), groupValidator, validate, controller.create);
+router.get('/:id', authorize(...readRoles), controller.getById);
+router.put('/:id', authorize(...writeRoles), groupValidator, validate, controller.update);
+router.delete('/:id', authorize(...writeRoles), controller.remove);
 
 module.exports = router;

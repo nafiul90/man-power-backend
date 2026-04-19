@@ -22,4 +22,11 @@ const rate = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { getByGroupTraining, getByMember, rate };
+const getByGroup = async (req, res, next) => {
+  try {
+    const result = await service.getByGroup(req.params.groupId, req.user);
+    sendSuccess(res, 200, 'Group member trainings fetched.', result);
+  } catch (err) { next(err); }
+};
+
+module.exports = { getByGroupTraining, getByGroup, getByMember, rate };

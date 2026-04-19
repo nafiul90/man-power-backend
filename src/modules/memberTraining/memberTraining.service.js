@@ -34,4 +34,13 @@ const rate = async (id, reqUser, { rating }) => {
   return mt;
 };
 
-module.exports = { getByGroupTraining, getByMember, rate };
+const getByGroup = async (groupId, reqUser) => {
+  const orgFilter = buildOrgFilter(reqUser);
+  return MemberTraining.find({ group: groupId, ...orgFilter })
+    .populate('member', 'fullName phone email userId')
+    .populate('training', 'title')
+    .populate('groupTraining', 'status')
+    .populate('ratedBy', 'fullName');
+};
+
+module.exports = { getByGroupTraining, getByGroup, getByMember, rate };

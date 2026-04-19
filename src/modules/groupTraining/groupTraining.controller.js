@@ -43,4 +43,12 @@ const remove = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { getByGroup, getById, assign, updateInstructors, updateStatus, remove };
+const getMine = async (req, res, next) => {
+  try {
+    const orgFilter = require('../../utils/scope').buildOrgFilter(req.user);
+    const result = await service.getByInstructor(req.user._id, orgFilter, req.query);
+    sendSuccess(res, 200, 'Assigned trainings fetched.', result);
+  } catch (err) { next(err); }
+};
+
+module.exports = { getByGroup, getById, assign, updateInstructors, updateStatus, getMine, remove };

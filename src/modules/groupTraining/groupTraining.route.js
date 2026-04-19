@@ -11,6 +11,7 @@ const manageRoles = ['Super Admin', 'Org Owner', 'Manager'];
 
 router.use(authenticate);
 
+router.get('/mine', authorize(...manageRoles, 'Instructor'), controller.getMine);
 router.get('/group/:groupId', authorize(...manageRoles, 'Instructor'), controller.getByGroup);
 router.get('/:id', authorize(...manageRoles, 'Instructor'), controller.getById);
 

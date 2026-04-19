@@ -98,4 +98,19 @@ const remove = async (id, reqUser) => {
   return gt;
 };
 
-module.exports = { getByGroup, getById, assign, updateInstructors, updateStatus, remove };
+const getByInstructor = async (instructorId, orgFilter, { page = 1, limit = 50 }) => {
+  const query = { instructors: instructorId, ...orgFilter };
+  const skip = (page - 1) * limit;
+  const [groupTrainings, total] = await Promise.all([
+    GroupTraining.find(query)
+      .populate('training', 'title purpose')
+      .populate('group', 'title')
+      .populate('instructors', 'fullName phone')
+      .populate('statusHistory.updatedBy', 'fullName')
+      .skip(skip).limit(Number(limit)).sort({ createdAt: -1 }),
+    GroupTraining.countDocuments(query),
+  ]);
+  return { groupTrainings, total, page: Number(page), pages: Math.ceil(total / limit) };
+};
+
+module.exports = { getByGroup, getById, assign, updateInstructors, updateStatus, getByInstructor, remove };

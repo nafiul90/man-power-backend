@@ -10,6 +10,7 @@ const allowedRoles = ['Super Admin', 'Org Owner', 'Manager', 'Instructor'];
 router.use(authenticate, authorize(...allowedRoles));
 
 router.get('/group-training/:groupTrainingId', controller.getByGroupTraining);
+router.get('/group-scope/:groupId', controller.getByGroup);
 router.get('/member/:memberId', controller.getByMember);
 router.put(
   '/:id/rate',

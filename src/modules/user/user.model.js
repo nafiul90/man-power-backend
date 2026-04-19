@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const Counter = require("../counter/counter.model");
 
 const ROLES = [
   "Super Admin",
@@ -43,6 +44,12 @@ const userSchema = new mongoose.Schema(
       enum: ROLES,
       default: "Member",
     },
+    userId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -57,6 +64,14 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.pre("save", async function (next) {
+  if (this.isNew && !this.userId) {
+    const counter = await Counter.findByIdAndUpdate(
+      "user",
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    this.userId = `USR-${String(counter.seq).padStart(6, "0")}`;
+  }
   if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
