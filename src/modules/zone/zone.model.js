@@ -1,22 +1,30 @@
 const mongoose = require('mongoose');
 
-const ZONE_TYPES = ['Division', 'District', 'Upazila', 'Union'];
-
 const zoneSchema = new mongoose.Schema(
   {
-    name: {
+    title: {
       type: String,
-      required: [true, 'Zone name is required'],
+      required: [true, 'Zone title is required'],
       trim: true,
     },
-    type: {
-      type: String,
-      enum: ZONE_TYPES,
-      required: [true, 'Zone type is required'],
-    },
-    parent: {
+    division: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Zone',
+      ref: 'AdminArea',
+      default: null,
+    },
+    district: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminArea',
+      default: null,
+    },
+    upazila: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminArea',
+      default: null,
+    },
+    union: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminArea',
       default: null,
     },
     org: {
@@ -29,7 +37,6 @@ const zoneSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-zoneSchema.index({ name: 1, type: 1, org: 1 }, { unique: true });
+zoneSchema.index({ title: 1, org: 1 }, { unique: true });
 
 module.exports = mongoose.model('Zone', zoneSchema);
-module.exports.ZONE_TYPES = ZONE_TYPES;

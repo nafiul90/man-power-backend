@@ -10,8 +10,12 @@ const authenticate = async (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
   const decoded = verifyToken(token);
+
   const user = await User.findById(decoded.id).select('-password');
   if (!user) return sendError(res, 401, 'User not found.');
+
+  // Attach org from JWT (avoids an extra DB lookup on every request)
+  user.org = decoded.org ?? user.org ?? null;
 
   req.user = user;
   next();

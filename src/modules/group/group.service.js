@@ -1,15 +1,18 @@
 const Group = require('./group.model');
+const { buildOrgFilter } = require('../../utils/scope');
 
-const getAll = async (orgId, { page = 1, limit = 20, search }) => {
-  const query = { org: orgId };
+const getAll = async (reqUser, { page = 1, limit = 20, search, orgId }) => {
+  const orgFilter = buildOrgFilter(reqUser, orgId);
+  const query = { ...orgFilter };
   if (search) query.title = { $regex: search, $options: 'i' };
 
   const skip = (page - 1) * limit;
   const [groups, total] = await Promise.all([
     Group.find(query)
-      .populate('zone', 'name type')
+      .populate('zone', 'title')
       .populate('category', 'title')
       .populate('members', 'fullName phone role')
+      .populate('org', 'title')
       .skip(skip)
       .limit(Number(limit))
       .sort({ createdAt: -1 }),
@@ -18,34 +21,39 @@ const getAll = async (orgId, { page = 1, limit = 20, search }) => {
   return { groups, total, page: Number(page), pages: Math.ceil(total / limit) };
 };
 
-const getById = async (id, orgId) => {
-  const group = await Group.findOne({ _id: id, org: orgId })
-    .populate('zone', 'name type')
+const getById = async (id, reqUser) => {
+  const orgFilter = buildOrgFilter(reqUser);
+  const group = await Group.findOne({ _id: id, ...orgFilter })
+    .populate('zone', 'title')
     .populate('category', 'title')
     .populate('members', 'fullName phone role');
   if (!group) throw { statusCode: 404, message: 'Group not found.' };
   return group;
 };
 
-const create = async (orgId, data) => {
-  return Group.create({ ...data, org: orgId });
+const create = async (reqUser, data) => {
+  const orgFilter = buildOrgFilter(reqUser);
+  if (!orgFilter.org) throw { statusCode: 400, message: 'No organization associated with your account.' };
+  return Group.create({ ...data, org: orgFilter.org });
 };
 
-const update = async (id, orgId, data) => {
+const update = async (id, reqUser, data) => {
+  const orgFilter = buildOrgFilter(reqUser);
   const group = await Group.findOneAndUpdate(
-    { _id: id, org: orgId },
+    { _id: id, ...orgFilter },
     data,
     { new: true, runValidators: true }
   )
-    .populate('zone', 'name type')
+    .populate('zone', 'title')
     .populate('category', 'title')
     .populate('members', 'fullName phone role');
   if (!group) throw { statusCode: 404, message: 'Group not found.' };
   return group;
 };
 
-const remove = async (id, orgId) => {
-  const group = await Group.findOneAndDelete({ _id: id, org: orgId });
+const remove = async (id, reqUser) => {
+  const orgFilter = buildOrgFilter(reqUser);
+  const group = await Group.findOneAndDelete({ _id: id, ...orgFilter });
   if (!group) throw { statusCode: 404, message: 'Group not found.' };
   return group;
 };

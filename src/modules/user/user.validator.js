@@ -14,12 +14,12 @@ const createUserValidator = [
     .isIn(['Super Admin', 'Org Owner', 'Manager', 'Instructor', 'Accountant', 'Member'])
     .withMessage('Invalid role.'),
   body('gender').optional().isIn(['Male', 'Female', 'Other']).withMessage('Invalid gender.'),
-  body('email').optional().isEmail().withMessage('Invalid email.'),
+  body('email').optional(),
 ];
 
 const updateUserValidator = [
   body('fullName').optional().trim().notEmpty().withMessage('Full name cannot be empty.'),
-  body('email').optional().isEmail().withMessage('Invalid email.'),
+  body('email').optional(),
   body('gender').optional().isIn(['Male', 'Female', 'Other']).withMessage('Invalid gender.'),
   body('role')
     .optional()

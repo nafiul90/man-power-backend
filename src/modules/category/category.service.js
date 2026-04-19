@@ -1,7 +1,9 @@
 const Category = require('./category.model');
+const { buildOrgFilter } = require('../../utils/scope');
 
-const getAll = async (orgId, { page = 1, limit = 50, search }) => {
-  const query = { org: orgId };
+const getAll = async (reqUser, { page = 1, limit = 50, search, orgId }) => {
+  const orgFilter = buildOrgFilter(reqUser, orgId);
+  const query = { ...orgFilter };
   if (search) query.title = { $regex: search, $options: 'i' };
 
   const skip = (page - 1) * limit;
@@ -12,19 +14,23 @@ const getAll = async (orgId, { page = 1, limit = 50, search }) => {
   return { categories, total, page: Number(page), pages: Math.ceil(total / limit) };
 };
 
-const getById = async (id, orgId) => {
-  const category = await Category.findOne({ _id: id, org: orgId });
+const getById = async (id, reqUser) => {
+  const orgFilter = buildOrgFilter(reqUser);
+  const category = await Category.findOne({ _id: id, ...orgFilter });
   if (!category) throw { statusCode: 404, message: 'Category not found.' };
   return category;
 };
 
-const create = async (orgId, { title }) => {
-  return Category.create({ title, org: orgId });
+const create = async (reqUser, { title }) => {
+  const orgFilter = buildOrgFilter(reqUser);
+  if (!orgFilter.org) throw { statusCode: 400, message: 'No organization associated with your account.' };
+  return Category.create({ title, org: orgFilter.org });
 };
 
-const update = async (id, orgId, { title }) => {
+const update = async (id, reqUser, { title }) => {
+  const orgFilter = buildOrgFilter(reqUser);
   const category = await Category.findOneAndUpdate(
-    { _id: id, org: orgId },
+    { _id: id, ...orgFilter },
     { title },
     { new: true, runValidators: true }
   );
@@ -32,8 +38,9 @@ const update = async (id, orgId, { title }) => {
   return category;
 };
 
-const remove = async (id, orgId) => {
-  const category = await Category.findOneAndDelete({ _id: id, org: orgId });
+const remove = async (id, reqUser) => {
+  const orgFilter = buildOrgFilter(reqUser);
+  const category = await Category.findOneAndDelete({ _id: id, ...orgFilter });
   if (!category) throw { statusCode: 404, message: 'Category not found.' };
   return category;
 };
