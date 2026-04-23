@@ -65,6 +65,12 @@ const userSchema = new mongoose.Schema(
       ref: "Organization",
       default: null,
     },
+    directRatings: [{
+      ratedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+      raterRole: { type: String, required: true },
+      rating: { type: Number, min: 0, max: 10, required: true },
+      ratedAt: { type: Date, default: Date.now },
+    }],
   },
   { timestamps: true },
 );

@@ -7,14 +7,14 @@ const validate = require('../../middleware/validate.middleware');
 const router = express.Router();
 
 const titleValidator = [body('title').trim().notEmpty().withMessage('Title is required.')];
-const allowedRoles = ['Super Admin', 'Org Owner'];
+const writeRoles = ['Super Admin', 'Org Owner', 'Manager', 'Ward Admin'];
+const readRoles = [...writeRoles, 'District Admin', 'Upazila Admin', 'Union Admin', 'Team Leader', 'Secretary', 'Instructor', 'Member'];
 
-router.use(authenticate, authorize(...allowedRoles));
-
-router.get('/', controller.getAll);
-router.post('/', titleValidator, validate, controller.create);
-router.get('/:id', controller.getById);
-router.put('/:id', titleValidator, validate, controller.update);
-router.delete('/:id', controller.remove);
+router.use(authenticate);
+router.get('/', authorize(...readRoles), controller.getAll);
+router.post('/', authorize(...writeRoles), titleValidator, validate, controller.create);
+router.get('/:id', authorize(...readRoles), controller.getById);
+router.put('/:id', authorize(...writeRoles), titleValidator, validate, controller.update);
+router.delete('/:id', authorize(...writeRoles), controller.remove);
 
 module.exports = router;

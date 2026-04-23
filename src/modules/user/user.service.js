@@ -92,7 +92,7 @@ const getAllUsers = async (reqUser, {
     const userIds = users.map((u) => u._id);
     const orgMatch = orgFilter.org ? { org: orgFilter.org } : {};
 
-    const [mtStats, certStats, groupStats] = await Promise.all([
+    const [mtStats, certStats, groupStats, usersWithDr] = await Promise.all([
       MemberTraining.aggregate([
         { $match: { member: { $in: userIds }, ...orgMatch } },
         { $project: { member: 1, perTrainingAvg: { $avg: '$ratings.rating' } } },
@@ -108,14 +108,37 @@ const getAllUsers = async (reqUser, {
         { $match: { members: { $in: userIds } } },
         { $group: { _id: '$members', count: { $sum: 1 } } },
       ]),
+      User.find({ _id: { $in: userIds } }).select('directRatings'),
     ]);
 
+    const drMap = {};
+    usersWithDr.forEach((u) => {
+      if (u.directRatings && u.directRatings.length > 0) {
+        const sum = u.directRatings.reduce((a, r) => a + r.rating, 0);
+        drMap[String(u._id)] = sum / u.directRatings.length;
+      }
+    });
+
     mtStats.forEach((s) => {
+      const mtAvg = s.avgRating != null ? s.avgRating : null;
+      const drAvg = drMap[String(s._id)] ?? null;
+      let combined = null;
+      if (mtAvg !== null && drAvg !== null) combined = (mtAvg + drAvg) / 2;
+      else if (mtAvg !== null) combined = mtAvg;
+      else if (drAvg !== null) combined = drAvg;
       statsMap[String(s._id)] = {
         trainings: s.count,
-        avgRating: s.avgRating != null ? parseFloat(s.avgRating.toFixed(1)) : null,
+        avgRating: combined != null ? parseFloat(combined.toFixed(1)) : null,
       };
     });
+
+    // Also pick up users with ONLY direct ratings (no memberTraining records)
+    Object.entries(drMap).forEach(([uid, drAvg]) => {
+      if (!statsMap[uid]) {
+        statsMap[uid] = { trainings: 0, avgRating: parseFloat(drAvg.toFixed(1)) };
+      }
+    });
+
     certStats.forEach((s) => {
       statsMap[String(s._id)] = { ...statsMap[String(s._id)], certs: s.count };
     });
@@ -225,7 +248,7 @@ const getMemberStats = async (id, reqUser) => {
   const orgFilter = buildOrgFilter(reqUser);
   const orgMatch = orgFilter.org ? { org: orgFilter.org } : {};
 
-  const [mtStats, certStats, groupStats] = await Promise.all([
+  const [mtStats, certStats, groupStats, targetUser] = await Promise.all([
     MemberTraining.aggregate([
       { $match: { member: require('mongoose').Types.ObjectId.createFromHexString(id), ...orgMatch } },
       { $project: { member: 1, perTrainingAvg: { $avg: '$ratings.rating' } } },
@@ -233,15 +256,44 @@ const getMemberStats = async (id, reqUser) => {
     ]),
     Certificate.countDocuments({ member: id, ...orgMatch, status: 'Active' }),
     Group.countDocuments({ members: id, ...orgMatch }),
+    User.findById(id).select('directRatings'),
   ]);
 
   const mt = mtStats[0] ?? {};
+  const mtAvg = mt.avgRating != null ? mt.avgRating : null;
+  let drAvg = null;
+  if (targetUser?.directRatings?.length > 0) {
+    const sum = targetUser.directRatings.reduce((a, r) => a + r.rating, 0);
+    drAvg = sum / targetUser.directRatings.length;
+  }
+  let combined = null;
+  if (mtAvg !== null && drAvg !== null) combined = (mtAvg + drAvg) / 2;
+  else if (mtAvg !== null) combined = mtAvg;
+  else if (drAvg !== null) combined = drAvg;
+
   return {
     trainings: mt.count ?? 0,
-    avgRating: mt.avgRating != null ? parseFloat(mt.avgRating.toFixed(1)) : null,
+    avgRating: combined != null ? parseFloat(combined.toFixed(1)) : null,
     certs: certStats,
     groups: groupStats,
+    directRatings: targetUser?.directRatings ?? [],
   };
+};
+
+const rateUser = async (id, reqUser, rating) => {
+  const orgFilter = buildOrgFilter(reqUser);
+  const user = await User.findOne({ _id: id, ...orgFilter });
+  if (!user) throw { statusCode: 404, message: 'User not found.' };
+
+  const idx = user.directRatings.findIndex((r) => String(r.ratedBy) === String(reqUser._id));
+  if (idx >= 0) {
+    user.directRatings[idx].rating = rating;
+    user.directRatings[idx].ratedAt = new Date();
+  } else {
+    user.directRatings.push({ ratedBy: reqUser._id, raterRole: reqUser.role, rating, ratedAt: new Date() });
+  }
+  await user.save();
+  return user;
 };
 
 module.exports = {
@@ -255,4 +307,5 @@ module.exports = {
   updateProfile,
   changeOwnPassword,
   getMemberStats,
+  rateUser,
 };

@@ -75,8 +75,15 @@ const getMemberStats = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const rateUser = async (req, res, next) => {
+  try {
+    const user = await userService.rateUser(req.params.id, req.user, req.body.rating);
+    return sendSuccess(res, 200, 'User rated.', user);
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   login, getMe, updateProfile, changeOwnPassword,
   getAllUsers, getUserById, createUser, updateUser, changeUserPassword, deleteUser,
-  getMemberStats,
+  getMemberStats, rateUser,
 };

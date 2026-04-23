@@ -13,7 +13,7 @@ const groupValidator = [
   body('members').optional().isArray().withMessage('Members must be an array.'),
 ];
 
-const writeRoles = ['Super Admin', 'Org Owner'];
+const writeRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
 const readRoles = [...writeRoles, 'Manager', 'Instructor', 'Team Leader', 'Secretary', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
 
 router.use(authenticate);

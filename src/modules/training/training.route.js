@@ -12,16 +12,16 @@ const trainingValidator = [
   body('purpose').optional().trim(),
 ];
 
-const allowedRoles = ['Super Admin', 'Org Owner', 'Manager'];
+const readRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin', 'Team Leader', 'Secretary', 'Instructor'];
+const writeRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
 
-router.use(authenticate, authorize(...allowedRoles));
-
-router.get('/', controller.getAll);
-router.post('/', trainingValidator, validate, controller.create);
-router.get('/:id', controller.getById);
-router.put('/:id', trainingValidator, validate, controller.update);
-router.delete('/:id', controller.remove);
-router.post('/:id/images', trainingImageUpload.single('image'), controller.uploadImage);
-router.delete('/:id/images/:imageId', controller.deleteImage);
+router.use(authenticate);
+router.get('/', authorize(...readRoles), controller.getAll);
+router.post('/', authorize(...writeRoles), trainingValidator, validate, controller.create);
+router.get('/:id', authorize(...readRoles), controller.getById);
+router.put('/:id', authorize(...writeRoles), trainingValidator, validate, controller.update);
+router.delete('/:id', authorize(...writeRoles), controller.remove);
+router.post('/:id/images', authorize(...writeRoles), trainingImageUpload.single('image'), controller.uploadImage);
+router.delete('/:id/images/:imageId', authorize(...writeRoles), controller.deleteImage);
 
 module.exports = router;
