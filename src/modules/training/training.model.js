@@ -16,6 +16,15 @@ const trainingSchema = new mongoose.Schema(
       ref: 'Organization',
       required: true,
     },
+    images: [
+      {
+        filename: { type: String, required: true },
+        originalName: { type: String },
+        url: { type: String, required: true },
+        uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

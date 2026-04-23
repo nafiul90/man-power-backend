@@ -9,6 +9,8 @@ const trainingRoutes = require('../modules/training/training.route');
 const groupTrainingRoutes = require('../modules/groupTraining/groupTraining.route');
 const memberTrainingRoutes = require('../modules/memberTraining/memberTraining.route');
 const certificateRoutes = require('../modules/certificate/certificate.route');
+const fundRoutes = require('../modules/fund/fund.route');
+const installmentRoutes = require('../modules/installment/installment.route');
 
 const router = express.Router();
 
@@ -22,5 +24,7 @@ router.use('/trainings', trainingRoutes);
 router.use('/group-trainings', groupTrainingRoutes);
 router.use('/member-trainings', memberTrainingRoutes);
 router.use('/certificates', certificateRoutes);
+router.use('/funds', fundRoutes);
+router.use('/installments', installmentRoutes);
 
 module.exports = router;

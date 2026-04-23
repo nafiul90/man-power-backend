@@ -1,6 +1,7 @@
 const express = require('express');
 const controller = require('./training.controller');
 const { authenticate, authorize } = require('../../middleware/auth.middleware');
+const { trainingImageUpload } = require('../../middleware/upload.middleware');
 const { body } = require('express-validator');
 const validate = require('../../middleware/validate.middleware');
 
@@ -20,5 +21,7 @@ router.post('/', trainingValidator, validate, controller.create);
 router.get('/:id', controller.getById);
 router.put('/:id', trainingValidator, validate, controller.update);
 router.delete('/:id', controller.remove);
+router.post('/:id/images', trainingImageUpload.single('image'), controller.uploadImage);
+router.delete('/:id/images/:imageId', controller.deleteImage);
 
 module.exports = router;

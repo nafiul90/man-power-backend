@@ -36,4 +36,19 @@ const remove = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { getAll, getById, create, update, remove };
+const uploadImage = async (req, res, next) => {
+  try {
+    if (!req.file) throw { statusCode: 400, message: 'No image file provided.' };
+    const training = await service.addImage(req.params.id, req.user, req.file);
+    sendSuccess(res, 201, 'Image uploaded.', training);
+  } catch (err) { next(err); }
+};
+
+const deleteImage = async (req, res, next) => {
+  try {
+    const training = await service.removeImage(req.params.id, req.params.imageId, req.user);
+    sendSuccess(res, 200, 'Image removed.', training);
+  } catch (err) { next(err); }
+};
+
+module.exports = { getAll, getById, create, update, remove, uploadImage, deleteImage };
