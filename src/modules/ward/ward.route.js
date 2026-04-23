@@ -12,15 +12,17 @@ const wardValidator = [
   body('district').optional({ nullable: true }).isMongoId().withMessage('Invalid district ID.'),
   body('upazila').optional({ nullable: true }).isMongoId().withMessage('Invalid upazila ID.'),
   body('union').optional({ nullable: true }).isMongoId().withMessage('Invalid union ID.'),
+  body('admins').optional().isArray().withMessage('admins must be an array.'),
 ];
 
-const allowedRoles = ['Super Admin', 'Org Owner'];
-router.use(authenticate, authorize(...allowedRoles));
+const writeRoles = ['Super Admin', 'Org Owner'];
+const readRoles = [...writeRoles, 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin', 'Team Leader', 'Secretary'];
 
-router.get('/', controller.getAll);
-router.post('/', wardValidator, validate, controller.create);
-router.get('/:id', controller.getById);
-router.put('/:id', wardValidator, validate, controller.update);
-router.delete('/:id', controller.remove);
+router.use(authenticate);
+router.get('/', authorize(...readRoles), controller.getAll);
+router.post('/', authorize(...writeRoles), wardValidator, validate, controller.create);
+router.get('/:id', authorize(...readRoles), controller.getById);
+router.put('/:id', authorize(...writeRoles), wardValidator, validate, controller.update);
+router.delete('/:id', authorize(...writeRoles), controller.remove);
 
 module.exports = router;

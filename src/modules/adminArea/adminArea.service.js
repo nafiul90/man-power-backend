@@ -3,6 +3,12 @@ const { buildOrgFilter } = require('../../utils/scope');
 
 const PARENT_TYPE = { District: 'Division', Upazila: 'District', Union: 'Upazila' };
 
+const GEO_ADMIN_ROLE_TYPE = {
+  'District Admin': 'District',
+  'Upazila Admin': 'Upazila',
+  'Union Admin': 'Union',
+};
+
 const getAll = async (reqUser, { type, parentId, page = 1, limit = 200, search, orgId }) => {
   const orgFilter = buildOrgFilter(reqUser, orgId);
   const query = { ...orgFilter };
@@ -10,10 +16,16 @@ const getAll = async (reqUser, { type, parentId, page = 1, limit = 200, search, 
   if (parentId) query.parent = parentId;
   if (search) query.name = { $regex: search, $options: 'i' };
 
+  if (GEO_ADMIN_ROLE_TYPE[reqUser.role]) {
+    query.type = GEO_ADMIN_ROLE_TYPE[reqUser.role]; // override type filter
+    query.admins = reqUser._id;
+  }
+
   const skip = (page - 1) * limit;
   const [areas, total] = await Promise.all([
     AdminArea.find(query)
       .populate('parent', 'name type')
+      .populate('admins', 'fullName phone role')
       .skip(skip)
       .limit(Number(limit))
       .sort({ name: 1 }),
@@ -24,12 +36,14 @@ const getAll = async (reqUser, { type, parentId, page = 1, limit = 200, search, 
 
 const getById = async (id, reqUser) => {
   const orgFilter = buildOrgFilter(reqUser);
-  const area = await AdminArea.findOne({ _id: id, ...orgFilter }).populate('parent', 'name type');
+  const area = await AdminArea.findOne({ _id: id, ...orgFilter })
+    .populate('parent', 'name type')
+    .populate('admins', 'fullName phone role');
   if (!area) throw { statusCode: 404, message: 'Admin area not found.' };
   return area;
 };
 
-const create = async (reqUser, { name, type, parent }) => {
+const create = async (reqUser, { name, type, parent, admins }) => {
   const orgFilter = buildOrgFilter(reqUser);
   if (!orgFilter.org) throw { statusCode: 400, message: 'No organization associated with your account.' };
 
@@ -37,10 +51,10 @@ const create = async (reqUser, { name, type, parent }) => {
     const parentArea = await AdminArea.findOne({ _id: parent, org: orgFilter.org, type: PARENT_TYPE[type] });
     if (!parentArea) throw { statusCode: 400, message: `Parent must be a ${PARENT_TYPE[type]}.` };
   }
-  return AdminArea.create({ name, type, parent: parent || null, org: orgFilter.org });
+  return AdminArea.create({ name, type, parent: parent || null, admins: admins || [], org: orgFilter.org });
 };
 
-const update = async (id, reqUser, { name, parent }) => {
+const update = async (id, reqUser, { name, parent, admins }) => {
   const orgFilter = buildOrgFilter(reqUser);
   const area = await AdminArea.findOne({ _id: id, ...orgFilter });
   if (!area) throw { statusCode: 404, message: 'Admin area not found.' };
@@ -53,8 +67,11 @@ const update = async (id, reqUser, { name, parent }) => {
   const data = {};
   if (name !== undefined) data.name = name;
   if (parent !== undefined) data.parent = parent || null;
+  if (admins !== undefined) data.admins = admins;
 
-  return AdminArea.findByIdAndUpdate(id, data, { new: true, runValidators: true }).populate('parent', 'name type');
+  return AdminArea.findByIdAndUpdate(id, data, { new: true, runValidators: true })
+    .populate('parent', 'name type')
+    .populate('admins', 'fullName phone role');
 };
 
 const remove = async (id, reqUser) => {

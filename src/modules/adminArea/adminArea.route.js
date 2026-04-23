@@ -9,15 +9,17 @@ const router = express.Router();
 const areaValidator = [
   body('name').trim().notEmpty().withMessage('Name is required.'),
   body('type').isIn(['Division', 'District', 'Upazila', 'Union']).withMessage('Invalid type.'),
+  body('admins').optional().isArray().withMessage('admins must be an array.'),
 ];
 
-const allowedRoles = ['Super Admin', 'Org Owner'];
-router.use(authenticate, authorize(...allowedRoles));
+const writeRoles = ['Super Admin', 'Org Owner'];
+const readRoles = [...writeRoles, 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin', 'Team Leader', 'Secretary'];
 
-router.get('/', controller.getAll);
-router.post('/', areaValidator, validate, controller.create);
-router.get('/:id', controller.getById);
-router.put('/:id', validate, controller.update);
-router.delete('/:id', controller.remove);
+router.use(authenticate);
+router.get('/', authorize(...readRoles), controller.getAll);
+router.post('/', authorize(...writeRoles), areaValidator, validate, controller.create);
+router.get('/:id', authorize(...readRoles), controller.getById);
+router.put('/:id', authorize(...writeRoles), areaValidator, validate, controller.update);
+router.delete('/:id', authorize(...writeRoles), controller.remove);
 
 module.exports = router;

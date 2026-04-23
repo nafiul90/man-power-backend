@@ -19,6 +19,7 @@ const adminAreaSchema = new mongoose.Schema(
       ref: 'AdminArea',
       default: null,
     },
+    admins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     org: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Organization',

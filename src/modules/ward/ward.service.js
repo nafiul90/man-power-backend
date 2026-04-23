@@ -6,6 +6,10 @@ const getAll = async (reqUser, { page = 1, limit = 50, search, orgId }) => {
   const query = { ...orgFilter };
   if (search) query.title = { $regex: search, $options: 'i' };
 
+  if (reqUser.role === 'Ward Admin') {
+    query.admins = reqUser._id;
+  }
+
   const skip = (page - 1) * limit;
   const [wards, total] = await Promise.all([
     Ward.find(query)
@@ -13,6 +17,7 @@ const getAll = async (reqUser, { page = 1, limit = 50, search, orgId }) => {
       .populate('district', 'name')
       .populate('upazila', 'name')
       .populate('union', 'name')
+      .populate('admins', 'fullName phone role')
       .populate('org', 'title')
       .skip(skip)
       .limit(Number(limit))
@@ -28,7 +33,8 @@ const getById = async (id, reqUser) => {
     .populate('division', 'name')
     .populate('district', 'name')
     .populate('upazila', 'name')
-    .populate('union', 'name');
+    .populate('union', 'name')
+    .populate('admins', 'fullName phone role');
   if (!ward) throw { statusCode: 404, message: 'Ward not found.' };
   return ward;
 };
@@ -49,7 +55,8 @@ const update = async (id, reqUser, data) => {
     .populate('division', 'name')
     .populate('district', 'name')
     .populate('upazila', 'name')
-    .populate('union', 'name');
+    .populate('union', 'name')
+    .populate('admins', 'fullName phone role');
   if (!ward) throw { statusCode: 404, message: 'Ward not found.' };
   return ward;
 };
