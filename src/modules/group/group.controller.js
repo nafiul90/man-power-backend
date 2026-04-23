@@ -36,4 +36,11 @@ const remove = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { getAll, getById, create, update, remove };
+const updateAssignees = async (req, res, next) => {
+  try {
+    const group = await service.updateAssignees(req.params.id, req.user, req.body);
+    sendSuccess(res, 200, 'Group assignees updated.', group);
+  } catch (err) { next(err); }
+};
+
+module.exports = { getAll, getById, create, update, remove, updateAssignees };

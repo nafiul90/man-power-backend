@@ -6,14 +6,14 @@ const validate = require('../../middleware/validate.middleware');
 
 const router = express.Router();
 
-const statusRoles = ['Super Admin', 'Org Owner', 'Manager', 'Instructor'];
-const manageRoles = ['Super Admin', 'Org Owner', 'Manager'];
+const statusRoles = ['Super Admin', 'Org Owner', 'Manager', 'Instructor', 'Team Leader', 'Secretary', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
+const manageRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
 
 router.use(authenticate);
 
-router.get('/mine', authorize(...manageRoles, 'Instructor'), controller.getMine);
-router.get('/group/:groupId', authorize(...manageRoles, 'Instructor'), controller.getByGroup);
-router.get('/:id', authorize(...manageRoles, 'Instructor'), controller.getById);
+router.get('/mine', authorize(...manageRoles, 'Instructor', 'Team Leader', 'Secretary'), controller.getMine);
+router.get('/group/:groupId', authorize(...manageRoles, 'Instructor', 'Team Leader', 'Secretary'), controller.getByGroup);
+router.get('/:id', authorize(...manageRoles, 'Instructor', 'Team Leader', 'Secretary'), controller.getById);
 
 router.post(
   '/',

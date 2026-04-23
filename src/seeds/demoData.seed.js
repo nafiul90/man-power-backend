@@ -129,6 +129,10 @@ async function seed() {
   const inst3   = await mkUser({ fullName: 'Sabina Yasmin',     phone: '01700000006', gender: 'Female', role: 'Instructor' });
   const acct1   = await mkUser({ fullName: 'Habibur Rahman',    phone: '01700000007', gender: 'Male',   role: 'Accountant' });
   const acct2   = await mkUser({ fullName: 'Lutfun Nahar',      phone: '01700000008', gender: 'Female', role: 'Accountant' });
+  const tl1     = await mkUser({ fullName: 'Rashida Khanam',    phone: '01700000009', gender: 'Female', role: 'Team Leader' });
+  const tl2     = await mkUser({ fullName: 'Kamal Hossen',      phone: '01700000010', gender: 'Male',   role: 'Team Leader' });
+  const sec1    = await mkUser({ fullName: 'Nasima Begum',      phone: '01700000011', gender: 'Female', role: 'Secretary' });
+  const sec2    = await mkUser({ fullName: 'Rafiqul Haque',     phone: '01700000012', gender: 'Male',   role: 'Secretary' });
 
   // Update org owners
   await Organization.findByIdAndUpdate(org._id, { $push: { owners: orgOwner._id } });
@@ -234,18 +238,21 @@ async function seed() {
       title: 'সবুজ বাংলা কৃষক দল',
       ward: zDhaka._id, category: catAgri._id,
       members: [m[0],m[1],m[2],m[3],m[4]].map(u=>u._id),
+      teamLeaders: [tl1._id], secretaries: [sec1._id],
       org: org._id,
     },
     {
       title: 'আলোর পথ মহিলা সমিতি',
       ward: zGazipur._id, category: catWomen._id,
       members: [m[5],m[6],m[7],m[8],m[9]].map(u=>u._id),
+      teamLeaders: [tl1._id, tl2._id], secretaries: [sec1._id],
       org: org._id,
     },
     {
       title: 'মেঘনা মৎস্যজীবী সমবায়',
       ward: zCTG._id, category: catFish._id,
       members: [m[10],m[11],m[12],m[13],m[14]].map(u=>u._id),
+      teamLeaders: [tl2._id], secretaries: [sec2._id],
       org: org._id,
     },
     {
@@ -318,9 +325,7 @@ async function seed() {
 
   const enroll = (member, groupTraining, group, training, rating) => ({
     member, groupTraining, group, training, org: org._id,
-    rating: rating || null,
-    ratedBy: rating ? inst1._id : null,
-    ratedAt: rating ? daysAgo(8) : null,
+    ratings: rating != null ? [{ ratedBy: inst1._id, raterRole: 'Instructor', rating, ratedAt: daysAgo(8) }] : [],
   });
 
   const mtDocs = [
@@ -542,6 +547,8 @@ async function seed() {
   console.log('  Instructor     : 01700000004    / 123456');
   console.log('  Instructor     : 01700000005    / 123456');
   console.log('  Accountant     : 01700000007    / 123456');
+  console.log('  Team Leader    : 01700000009    / 123456');
+  console.log('  Secretary      : 01700000011    / 123456');
   console.log('  Member (sample): 01711234501    / 123456');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('\n  Organization : গ্রামীণ উন্নয়ন সংস্থা (GUS)');

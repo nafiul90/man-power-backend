@@ -11,7 +11,7 @@ const createUserValidator = [
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters.'),
   body('role')
     .optional()
-    .isIn(['Super Admin', 'Org Owner', 'Manager', 'Instructor', 'Accountant', 'Member'])
+    .isIn(['Super Admin', 'Org Owner', 'Manager', 'Instructor', 'Accountant', 'Member', 'Team Leader', 'Secretary', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'])
     .withMessage('Invalid role.'),
   body('gender').optional().isIn(['Male', 'Female', 'Other']).withMessage('Invalid gender.'),
   body('email').optional(),
@@ -23,7 +23,7 @@ const updateUserValidator = [
   body('gender').optional().isIn(['Male', 'Female', 'Other']).withMessage('Invalid gender.'),
   body('role')
     .optional()
-    .isIn(['Super Admin', 'Org Owner', 'Manager', 'Instructor', 'Accountant', 'Member'])
+    .isIn(['Super Admin', 'Org Owner', 'Manager', 'Instructor', 'Accountant', 'Member', 'Team Leader', 'Secretary', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'])
     .withMessage('Invalid role.'),
 ];
 

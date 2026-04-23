@@ -30,8 +30,8 @@ router.patch('/me', authenticate, updateUserValidator, validate, controller.upda
 router.patch('/me/change-password', authenticate, changeOwnPasswordValidator, validate, controller.changeOwnPassword);
 
 // Admin routes
-const adminRoles = ['Super Admin', 'Org Owner', 'Manager'];
-const readRoles = [...adminRoles, 'Instructor'];
+const adminRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
+const readRoles = [...adminRoles, 'Instructor', 'Team Leader', 'Secretary'];
 
 router.get('/', authenticate, authorize(...readRoles), controller.getAllUsers);
 router.post('/', authenticate, authorize('Super Admin', 'Org Owner'), restrictSuperAdminRole, createUserValidator, validate, controller.createUser);

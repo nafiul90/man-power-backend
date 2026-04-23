@@ -5,7 +5,7 @@ const { body } = require('express-validator');
 const validate = require('../../middleware/validate.middleware');
 
 const router = express.Router();
-const allowedRoles = ['Super Admin', 'Org Owner', 'Manager', 'Instructor'];
+const allowedRoles = ['Super Admin', 'Org Owner', 'Manager', 'Instructor', 'Team Leader', 'Secretary', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
 
 router.use(authenticate, authorize(...allowedRoles));
 

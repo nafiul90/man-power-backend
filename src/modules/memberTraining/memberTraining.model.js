@@ -27,18 +27,12 @@ const memberTrainingSchema = new mongoose.Schema(
       ref: 'Organization',
       required: true,
     },
-    rating: {
-      type: Number,
-      min: 0,
-      max: 10,
-      default: null,
-    },
-    ratedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      default: null,
-    },
-    ratedAt: { type: Date, default: null },
+    ratings: [{
+      ratedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+      raterRole: { type: String, required: true },
+      rating: { type: Number, min: 0, max: 10, required: true },
+      ratedAt: { type: Date, default: Date.now },
+    }],
   },
   { timestamps: true }
 );

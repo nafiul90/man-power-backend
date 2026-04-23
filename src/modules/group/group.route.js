@@ -14,7 +14,7 @@ const groupValidator = [
 ];
 
 const writeRoles = ['Super Admin', 'Org Owner'];
-const readRoles = [...writeRoles, 'Manager', 'Instructor'];
+const readRoles = [...writeRoles, 'Manager', 'Instructor', 'Team Leader', 'Secretary', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
 
 router.use(authenticate);
 
@@ -22,6 +22,10 @@ router.get('/', authorize(...readRoles), controller.getAll);
 router.post('/', authorize(...writeRoles), groupValidator, validate, controller.create);
 router.get('/:id', authorize(...readRoles), controller.getById);
 router.put('/:id', authorize(...writeRoles), groupValidator, validate, controller.update);
+router.put('/:id/assignees', authorize(...writeRoles), [
+  body('teamLeaders').optional().isArray().withMessage('teamLeaders must be an array.'),
+  body('secretaries').optional().isArray().withMessage('secretaries must be an array.'),
+], validate, controller.updateAssignees);
 router.delete('/:id', authorize(...writeRoles), controller.remove);
 
 module.exports = router;

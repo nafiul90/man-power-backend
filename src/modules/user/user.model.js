@@ -9,6 +9,12 @@ const ROLES = [
   "Instructor",
   "Accountant",
   "Member",
+  "Team Leader",
+  "Secretary",
+  "District Admin",
+  "Upazila Admin",
+  "Union Admin",
+  "Ward Admin",
 ];
 
 const userSchema = new mongoose.Schema(

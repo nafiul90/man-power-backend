@@ -23,6 +23,8 @@ const groupSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    teamLeaders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    secretaries: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     org: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Organization',

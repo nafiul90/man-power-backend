@@ -3,7 +3,7 @@ const MemberTraining = require('../memberTraining/memberTraining.model');
 const Group = require('../group/group.model');
 const { buildOrgFilter } = require('../../utils/scope');
 
-const STATUS_ROLES = ['Org Owner', 'Manager', 'Instructor'];
+const STATUS_ROLES = ['Org Owner', 'Manager', 'Instructor', 'Team Leader', 'Secretary', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
 
 const getByGroup = async (groupId, reqUser) => {
   const orgFilter = buildOrgFilter(reqUser);

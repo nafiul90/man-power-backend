@@ -63,11 +63,10 @@ const getAllUsers = async (reqUser, {
   }
 
   if (minRating !== undefined || maxRating !== undefined) {
-    const ratingMatch = { rating: { $ne: null } };
-    if (orgFilter.org) ratingMatch.org = orgFilter.org;
     const ratingAgg = await MemberTraining.aggregate([
-      { $match: ratingMatch },
-      { $group: { _id: '$member', avgRating: { $avg: '$rating' } } },
+      { $match: orgFilter.org ? { org: orgFilter.org } : {} },
+      { $project: { member: 1, perTrainingAvg: { $avg: '$ratings.rating' } } },
+      { $group: { _id: '$member', avgRating: { $avg: '$perTrainingAvg' } } },
       {
         $match: {
           avgRating: {
@@ -96,7 +95,8 @@ const getAllUsers = async (reqUser, {
     const [mtStats, certStats, groupStats] = await Promise.all([
       MemberTraining.aggregate([
         { $match: { member: { $in: userIds }, ...orgMatch } },
-        { $group: { _id: '$member', count: { $sum: 1 }, avgRating: { $avg: '$rating' } } },
+        { $project: { member: 1, perTrainingAvg: { $avg: '$ratings.rating' } } },
+        { $group: { _id: '$member', count: { $sum: 1 }, avgRating: { $avg: '$perTrainingAvg' } } },
       ]),
       Certificate.aggregate([
         { $match: { member: { $in: userIds }, ...orgMatch, status: 'Active' } },
@@ -228,7 +228,8 @@ const getMemberStats = async (id, reqUser) => {
   const [mtStats, certStats, groupStats] = await Promise.all([
     MemberTraining.aggregate([
       { $match: { member: require('mongoose').Types.ObjectId.createFromHexString(id), ...orgMatch } },
-      { $group: { _id: null, count: { $sum: 1 }, avgRating: { $avg: '$rating' } } },
+      { $project: { member: 1, perTrainingAvg: { $avg: '$ratings.rating' } } },
+      { $group: { _id: null, count: { $sum: 1 }, avgRating: { $avg: '$perTrainingAvg' } } },
     ]),
     Certificate.countDocuments({ member: id, ...orgMatch, status: 'Active' }),
     Group.countDocuments({ members: id, ...orgMatch }),
