@@ -52,7 +52,6 @@ const userSchema = new mongoose.Schema(
     },
     userId: {
       type: String,
-      unique: true,
       sparse: true,
       trim: true,
     },
@@ -65,12 +64,18 @@ const userSchema = new mongoose.Schema(
       ref: "Organization",
       default: null,
     },
-    directRatings: [{
-      ratedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-      raterRole: { type: String, required: true },
-      rating: { type: Number, min: 0, max: 10, required: true },
-      ratedAt: { type: Date, default: Date.now },
-    }],
+    directRatings: [
+      {
+        ratedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        raterRole: { type: String, required: true },
+        rating: { type: Number, min: 0, max: 10, required: true },
+        ratedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true },
 );
@@ -80,7 +85,7 @@ userSchema.pre("save", async function (next) {
     const counter = await Counter.findByIdAndUpdate(
       "user",
       { $inc: { seq: 1 } },
-      { new: true, upsert: true }
+      { new: true, upsert: true },
     );
     this.userId = `USR-${String(counter.seq).padStart(6, "0")}`;
   }
