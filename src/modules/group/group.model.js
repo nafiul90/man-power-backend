@@ -7,9 +7,9 @@ const groupSchema = new mongoose.Schema(
       required: [true, 'Group title is required'],
       trim: true,
     },
-    zone: {
+    ward: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Zone',
+      ref: 'Ward',
       default: null,
     },
     category: {

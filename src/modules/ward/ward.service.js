@@ -1,4 +1,4 @@
-const Zone = require('./zone.model');
+const Ward = require('./ward.model');
 const { buildOrgFilter } = require('../../utils/scope');
 
 const getAll = async (reqUser, { page = 1, limit = 50, search, orgId }) => {
@@ -7,8 +7,8 @@ const getAll = async (reqUser, { page = 1, limit = 50, search, orgId }) => {
   if (search) query.title = { $regex: search, $options: 'i' };
 
   const skip = (page - 1) * limit;
-  const [zones, total] = await Promise.all([
-    Zone.find(query)
+  const [wards, total] = await Promise.all([
+    Ward.find(query)
       .populate('division', 'name')
       .populate('district', 'name')
       .populate('upazila', 'name')
@@ -17,31 +17,31 @@ const getAll = async (reqUser, { page = 1, limit = 50, search, orgId }) => {
       .skip(skip)
       .limit(Number(limit))
       .sort({ title: 1 }),
-    Zone.countDocuments(query),
+    Ward.countDocuments(query),
   ]);
-  return { zones, total, page: Number(page), pages: Math.ceil(total / limit) };
+  return { wards, total, page: Number(page), pages: Math.ceil(total / limit) };
 };
 
 const getById = async (id, reqUser) => {
   const orgFilter = buildOrgFilter(reqUser);
-  const zone = await Zone.findOne({ _id: id, ...orgFilter })
+  const ward = await Ward.findOne({ _id: id, ...orgFilter })
     .populate('division', 'name')
     .populate('district', 'name')
     .populate('upazila', 'name')
     .populate('union', 'name');
-  if (!zone) throw { statusCode: 404, message: 'Zone not found.' };
-  return zone;
+  if (!ward) throw { statusCode: 404, message: 'Ward not found.' };
+  return ward;
 };
 
 const create = async (reqUser, data) => {
   const orgFilter = buildOrgFilter(reqUser);
   if (!orgFilter.org) throw { statusCode: 400, message: 'No organization associated with your account.' };
-  return Zone.create({ ...data, org: orgFilter.org });
+  return Ward.create({ ...data, org: orgFilter.org });
 };
 
 const update = async (id, reqUser, data) => {
   const orgFilter = buildOrgFilter(reqUser);
-  const zone = await Zone.findOneAndUpdate(
+  const ward = await Ward.findOneAndUpdate(
     { _id: id, ...orgFilter },
     data,
     { new: true, runValidators: true }
@@ -50,15 +50,15 @@ const update = async (id, reqUser, data) => {
     .populate('district', 'name')
     .populate('upazila', 'name')
     .populate('union', 'name');
-  if (!zone) throw { statusCode: 404, message: 'Zone not found.' };
-  return zone;
+  if (!ward) throw { statusCode: 404, message: 'Ward not found.' };
+  return ward;
 };
 
 const remove = async (id, reqUser) => {
   const orgFilter = buildOrgFilter(reqUser);
-  const zone = await Zone.findOneAndDelete({ _id: id, ...orgFilter });
-  if (!zone) throw { statusCode: 404, message: 'Zone not found.' };
-  return zone;
+  const ward = await Ward.findOneAndDelete({ _id: id, ...orgFilter });
+  if (!ward) throw { statusCode: 404, message: 'Ward not found.' };
+  return ward;
 };
 
 module.exports = { getAll, getById, create, update, remove };

@@ -8,7 +8,7 @@ const router = express.Router();
 
 const groupValidator = [
   body('title').trim().notEmpty().withMessage('Group title is required.'),
-  body('zone').optional().isMongoId().withMessage('Invalid zone ID.'),
+  body('ward').optional().isMongoId().withMessage('Invalid ward ID.'),
   body('category').optional().isMongoId().withMessage('Invalid category ID.'),
   body('members').optional().isArray().withMessage('Members must be an array.'),
 ];

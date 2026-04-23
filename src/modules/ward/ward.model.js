@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
-const zoneSchema = new mongoose.Schema(
+const wardSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: [true, 'Zone title is required'],
+      required: [true, 'Ward title is required'],
       trim: true,
     },
     division: {
@@ -37,6 +37,6 @@ const zoneSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-zoneSchema.index({ title: 1, org: 1 }, { unique: true });
+wardSchema.index({ title: 1, org: 1 }, { unique: true });
 
-module.exports = mongoose.model('Zone', zoneSchema);
+module.exports = mongoose.model('Ward', wardSchema);

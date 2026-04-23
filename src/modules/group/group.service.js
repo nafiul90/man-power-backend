@@ -9,7 +9,7 @@ const getAll = async (reqUser, { page = 1, limit = 20, search, orgId }) => {
   const skip = (page - 1) * limit;
   const [groups, total] = await Promise.all([
     Group.find(query)
-      .populate('zone', 'title')
+      .populate('ward', 'title')
       .populate('category', 'title')
       .populate('members', 'fullName phone role')
       .populate('org', 'title')
@@ -24,7 +24,7 @@ const getAll = async (reqUser, { page = 1, limit = 20, search, orgId }) => {
 const getById = async (id, reqUser) => {
   const orgFilter = buildOrgFilter(reqUser);
   const group = await Group.findOne({ _id: id, ...orgFilter })
-    .populate('zone', 'title')
+    .populate('ward', 'title')
     .populate('category', 'title')
     .populate('members', 'fullName phone role');
   if (!group) throw { statusCode: 404, message: 'Group not found.' };
@@ -44,7 +44,7 @@ const update = async (id, reqUser, data) => {
     data,
     { new: true, runValidators: true }
   )
-    .populate('zone', 'title')
+    .populate('ward', 'title')
     .populate('category', 'title')
     .populate('members', 'fullName phone role');
   if (!group) throw { statusCode: 404, message: 'Group not found.' };
