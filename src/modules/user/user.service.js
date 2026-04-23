@@ -166,7 +166,9 @@ const getAllUsers = async (reqUser, {
 
 const getUserById = async (id, reqUser) => {
   const orgFilter = buildOrgFilter(reqUser);
-  const user = await User.findOne({ _id: id, ...orgFilter }).populate('org', 'title');
+  const user = await User.findOne({ _id: id, ...orgFilter })
+    .populate('org', 'title')
+    .populate('directRatings.ratedBy', 'fullName role phone userId');
   if (!user) throw { statusCode: 404, message: 'User not found.' };
   return user;
 };

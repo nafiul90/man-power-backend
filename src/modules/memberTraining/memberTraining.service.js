@@ -32,7 +32,7 @@ const getByMember = async (memberId, reqUser) => {
     .populate('training', 'title purpose')
     .populate('group', 'title')
     .populate('groupTraining', 'status scheduledDate startedAt completedAt')
-    .populate('ratings.ratedBy', 'fullName role')
+    .populate('ratings.ratedBy', 'fullName role phone userId')
     .sort({ createdAt: -1 });
 };
 
