@@ -2,7 +2,7 @@ const Group = require('./group.model');
 const { buildOrgFilter } = require('../../utils/scope');
 const { resolveWardIds } = require('../../utils/geoScope');
 
-const getAll = async (reqUser, { page = 1, limit = 20, search, orgId }) => {
+const getAll = async (reqUser, { page = 1, limit = 20, search, orgId, wardId }) => {
   const orgFilter = buildOrgFilter(reqUser, orgId);
   const query = { ...orgFilter };
   if (search) query.title = { $regex: search, $options: 'i' };
@@ -14,8 +14,19 @@ const getAll = async (reqUser, { page = 1, limit = 20, search, orgId }) => {
   } else {
     const wardIds = await resolveWardIds(reqUser);
     if (wardIds !== null) {
-      if (wardIds.length === 0) return { groups: [], total: 0, page: Number(page), pages: 0 };
-      query.ward = { $in: wardIds };
+      // Geo-admin: restrict to their ward(s)
+      if (wardId) {
+        // Drill-down: verify the requested ward is within their scope
+        const inScope = wardIds.some((id) => String(id) === String(wardId));
+        if (!inScope) return { groups: [], total: 0, page: Number(page), pages: 0 };
+        query.ward = wardId;
+      } else {
+        if (wardIds.length === 0) return { groups: [], total: 0, page: Number(page), pages: 0 };
+        query.ward = { $in: wardIds };
+      }
+    } else if (wardId) {
+      // Non-geo admin with explicit ward drill-down filter
+      query.ward = wardId;
     }
   }
 
