@@ -3,22 +3,88 @@ const { buildOrgFilter } = require('../../utils/scope');
 
 const PARENT_TYPE = { District: 'Division', Upazila: 'District', Union: 'Upazila' };
 
-const GEO_ADMIN_ROLE_TYPE = {
-  'District Admin': 'District',
-  'Upazila Admin': 'Upazila',
-  'Union Admin': 'Union',
-};
+const EMPTY = (page, limit) => ({ areas: [], total: 0, page: Number(page), pages: 0 });
 
 const getAll = async (reqUser, { type, parentId, page = 1, limit = 200, search, orgId }) => {
   const orgFilter = buildOrgFilter(reqUser, orgId);
   const query = { ...orgFilter };
-  if (type) query.type = type;
-  if (parentId) query.parent = parentId;
   if (search) query.name = { $regex: search, $options: 'i' };
 
-  if (GEO_ADMIN_ROLE_TYPE[reqUser.role]) {
-    query.type = GEO_ADMIN_ROLE_TYPE[reqUser.role]; // override type filter
-    query.admins = reqUser._id;
+  const { role, geoScope } = reqUser;
+
+  if (role === 'Ward Admin') {
+    // Ward admins have no admin-area responsibilities
+    return EMPTY(page, limit);
+  }
+
+  if (role === 'Union Admin') {
+    const { unionId } = geoScope ?? {};
+    if (!unionId) return EMPTY(page, limit);
+    if (type && type !== 'Union') return EMPTY(page, limit);
+    query.type = 'Union';
+    query._id = unionId;
+
+  } else if (role === 'Upazila Admin') {
+    const { upazilaId } = geoScope ?? {};
+    if (!upazilaId) return EMPTY(page, limit);
+
+    const requestedType = type || null;
+    if (requestedType === 'Division' || requestedType === 'District') return EMPTY(page, limit);
+
+    if (!requestedType || requestedType === 'Upazila') {
+      query.type = 'Upazila';
+      query._id = upazilaId;
+    } else {
+      // Union — only those whose parent is their upazila
+      query.type = 'Union';
+      if (parentId) {
+        if (String(parentId) !== String(upazilaId)) return EMPTY(page, limit);
+        query.parent = parentId;
+      } else {
+        query.parent = upazilaId;
+      }
+    }
+
+  } else if (role === 'District Admin') {
+    const { districtId } = geoScope ?? {};
+    if (!districtId) return EMPTY(page, limit);
+
+    const requestedType = type || null;
+    if (requestedType === 'Division') return EMPTY(page, limit);
+
+    if (!requestedType || requestedType === 'District') {
+      query.type = 'District';
+      query._id = districtId;
+    } else if (requestedType === 'Upazila') {
+      query.type = 'Upazila';
+      if (parentId) {
+        if (String(parentId) !== String(districtId)) return EMPTY(page, limit);
+        query.parent = parentId;
+      } else {
+        query.parent = districtId;
+      }
+    } else {
+      // Union — only those under upazilas in their district
+      query.type = 'Union';
+      if (parentId) {
+        // Verify that parentId is a valid upazila inside this district
+        const upazila = await AdminArea.findOne({
+          _id: parentId, type: 'Upazila', parent: districtId, ...orgFilter,
+        }).select('_id');
+        if (!upazila) return EMPTY(page, limit);
+        query.parent = parentId;
+      } else {
+        const upazilas = await AdminArea.find({
+          type: 'Upazila', parent: districtId, ...orgFilter,
+        }).select('_id');
+        query.parent = { $in: upazilas.map((u) => u._id) };
+      }
+    }
+
+  } else {
+    // Non-geo admins (Super Admin, Org Owner, Manager, etc.) — normal filters
+    if (type) query.type = type;
+    if (parentId) query.parent = parentId;
   }
 
   const skip = (page - 1) * limit;

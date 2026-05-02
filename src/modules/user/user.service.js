@@ -4,6 +4,7 @@ const MemberTraining = require('../memberTraining/memberTraining.model');
 const Certificate = require('../certificate/certificate.model');
 const { generateToken } = require('../../utils/jwt');
 const { buildOrgFilter } = require('../../utils/scope');
+const { resolveGeoUserIds } = require('../../utils/geoScope');
 
 const login = async (phone, password) => {
   const user = await User.findOne({ phone }).select('+password').populate('org', '_id title');
@@ -46,6 +47,12 @@ const getAllUsers = async (reqUser, {
     const s = new Set(newIds.map(String));
     return existing === null ? [...s] : existing.filter((id) => s.has(String(id)));
   };
+
+  // Geo-admin scope: restrict to users within their assigned area
+  const geoUserIds = await resolveGeoUserIds(reqUser);
+  if (geoUserIds !== null) {
+    filterIds = intersect(filterIds, geoUserIds);
+  }
 
   if (groupId) {
     const group = await Group.findById(groupId).select('members');

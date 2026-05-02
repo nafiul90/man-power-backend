@@ -1,12 +1,23 @@
 const Group = require('./group.model');
 const { buildOrgFilter } = require('../../utils/scope');
+const { resolveWardIds } = require('../../utils/geoScope');
 
 const getAll = async (reqUser, { page = 1, limit = 20, search, orgId }) => {
   const orgFilter = buildOrgFilter(reqUser, orgId);
   const query = { ...orgFilter };
   if (search) query.title = { $regex: search, $options: 'i' };
-  if (reqUser.role === 'Team Leader') query.teamLeaders = reqUser._id;
-  else if (reqUser.role === 'Secretary') query.secretaries = reqUser._id;
+
+  if (reqUser.role === 'Team Leader') {
+    query.teamLeaders = reqUser._id;
+  } else if (reqUser.role === 'Secretary') {
+    query.secretaries = reqUser._id;
+  } else {
+    const wardIds = await resolveWardIds(reqUser);
+    if (wardIds !== null) {
+      if (wardIds.length === 0) return { groups: [], total: 0, page: Number(page), pages: 0 };
+      query.ward = { $in: wardIds };
+    }
+  }
 
   const skip = (page - 1) * limit;
   const [groups, total] = await Promise.all([

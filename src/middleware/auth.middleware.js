@@ -1,6 +1,7 @@
 const { verifyToken } = require('../utils/jwt');
 const { sendError } = require('../utils/response');
 const User = require('../modules/user/user.model');
+const { isGeoAdmin, resolveGeoScope } = require('../utils/geoScope');
 
 const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -16,6 +17,11 @@ const authenticate = async (req, res, next) => {
 
   // Attach org from JWT (avoids an extra DB lookup on every request)
   user.org = decoded.org ?? user.org ?? null;
+
+  // Resolve geographic scope once per request for geo-admin roles
+  if (isGeoAdmin(user.role)) {
+    user.geoScope = await resolveGeoScope(user);
+  }
 
   req.user = user;
   next();

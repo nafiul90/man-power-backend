@@ -6,8 +6,20 @@ const getAll = async (reqUser, { page = 1, limit = 50, search, orgId }) => {
   const query = { ...orgFilter };
   if (search) query.title = { $regex: search, $options: 'i' };
 
-  if (reqUser.role === 'Ward Admin') {
-    query.admins = reqUser._id;
+  const { role, geoScope } = reqUser;
+
+  if (role === 'Ward Admin') {
+    if (!geoScope?.wardIds?.length) return { wards: [], total: 0, page: Number(page), pages: 0 };
+    query._id = { $in: geoScope.wardIds };
+  } else if (role === 'Union Admin') {
+    if (!geoScope?.unionId) return { wards: [], total: 0, page: Number(page), pages: 0 };
+    query.union = geoScope.unionId;
+  } else if (role === 'Upazila Admin') {
+    if (!geoScope?.upazilaId) return { wards: [], total: 0, page: Number(page), pages: 0 };
+    query.upazila = geoScope.upazilaId;
+  } else if (role === 'District Admin') {
+    if (!geoScope?.districtId) return { wards: [], total: 0, page: Number(page), pages: 0 };
+    query.district = geoScope.districtId;
   }
 
   const skip = (page - 1) * limit;
