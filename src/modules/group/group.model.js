@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 
+const GROUP_LEVELS = ['Division', 'District', 'Upazila', 'Union', 'Ward'];
+
 const groupSchema = new mongoose.Schema(
   {
     title: {
@@ -7,6 +9,16 @@ const groupSchema = new mongoose.Schema(
       required: [true, 'Group title is required'],
       trim: true,
     },
+    level: {
+      type: String,
+      enum: GROUP_LEVELS,
+      required: [true, 'Group level is required'],
+      default: 'Ward',
+    },
+    division: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminArea', default: null },
+    district: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminArea', default: null },
+    upazila: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminArea', default: null },
+    union: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminArea', default: null },
     ward: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Ward',
@@ -17,12 +29,7 @@ const groupSchema = new mongoose.Schema(
       ref: 'Category',
       default: null,
     },
-    members: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-      },
-    ],
+    members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     teamLeaders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     secretaries: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     org: {
@@ -36,5 +43,11 @@ const groupSchema = new mongoose.Schema(
 );
 
 groupSchema.index({ title: 1, org: 1 }, { unique: true });
+groupSchema.index({ level: 1, org: 1 });
+groupSchema.index({ district: 1 });
+groupSchema.index({ upazila: 1 });
+groupSchema.index({ union: 1 });
 
-module.exports = mongoose.model('Group', groupSchema);
+const Group = mongoose.model('Group', groupSchema);
+Group.LEVELS = GROUP_LEVELS;
+module.exports = Group;

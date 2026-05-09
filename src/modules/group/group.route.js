@@ -8,8 +8,13 @@ const router = express.Router();
 
 const groupValidator = [
   body('title').trim().notEmpty().withMessage('Group title is required.'),
-  body('ward').optional().isMongoId().withMessage('Invalid ward ID.'),
-  body('category').optional().isMongoId().withMessage('Invalid category ID.'),
+  body('level').isIn(['Division', 'District', 'Upazila', 'Union', 'Ward']).withMessage('Invalid group level.'),
+  body('division').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid division ID.'),
+  body('district').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid district ID.'),
+  body('upazila').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid upazila ID.'),
+  body('union').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid union ID.'),
+  body('ward').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid ward ID.'),
+  body('category').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid category ID.'),
   body('members').optional().isArray().withMessage('Members must be an array.'),
 ];
 

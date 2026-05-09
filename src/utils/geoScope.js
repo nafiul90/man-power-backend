@@ -107,8 +107,12 @@ const resolveGeoUserIds = async (reqUser) => {
     wards.forEach((w) => w.admins.forEach((id) => userIds.add(String(id))));
   }
 
-  // --- collect group members in those wards ---
-  const groups = await Group.find({ ward: { $in: wardIds }, org: orgId }).select(
+  // --- collect group members in scope (ward-level + level-specific groups) ---
+  const groupOr = [{ ward: { $in: wardIds } }];
+  if (role === 'Union Admin' && geoScope.unionId) groupOr.push({ union: geoScope.unionId });
+  else if (role === 'Upazila Admin' && geoScope.upazilaId) groupOr.push({ upazila: geoScope.upazilaId });
+  else if (role === 'District Admin' && geoScope.districtId) groupOr.push({ district: geoScope.districtId });
+  const groups = await Group.find({ org: orgId, $or: groupOr }).select(
     'members teamLeaders secretaries',
   );
   groups.forEach((g) => {
