@@ -6,9 +6,15 @@ const validate = require('../../middleware/validate.middleware');
 
 const router = express.Router();
 
-const areaValidator = [
+const createValidator = [
   body('name').trim().notEmpty().withMessage('Name is required.'),
   body('type').isIn(['Division', 'District', 'Upazila', 'Thana', 'Union']).withMessage('Invalid type.'),
+  body('admins').optional().isArray().withMessage('admins must be an array.'),
+];
+
+// Type is immutable on update — only name/parent/admins may change.
+const updateValidator = [
+  body('name').optional().trim().notEmpty().withMessage('Name cannot be empty.'),
   body('admins').optional().isArray().withMessage('admins must be an array.'),
 ];
 
@@ -18,9 +24,9 @@ const readRoles = [...writeRoles, 'Union Admin', 'Ward Admin', 'Team Leader', 'S
 
 router.use(authenticate);
 router.get('/', authorize(...readRoles), controller.getAll);
-router.post('/', authorize(...writeRoles), areaValidator, validate, controller.create);
+router.post('/', authorize(...writeRoles), createValidator, validate, controller.create);
 router.get('/:id', authorize(...readRoles), controller.getById);
-router.put('/:id', authorize(...writeRoles), areaValidator, validate, controller.update);
+router.put('/:id', authorize(...writeRoles), updateValidator, validate, controller.update);
 router.delete('/:id', authorize(...writeRoles), controller.remove);
 
 module.exports = router;

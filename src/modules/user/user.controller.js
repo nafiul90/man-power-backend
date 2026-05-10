@@ -9,7 +9,11 @@ const login = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-const getMe = (req, res) => sendSuccess(res, 200, 'Profile fetched.', req.user);
+const getMe = (req, res) => {
+  // geoScope is attached at runtime by auth middleware; merge it into the JSON response.
+  const payload = { ...req.user.toJSON(), geoScope: req.user.geoScope ?? null };
+  return sendSuccess(res, 200, 'Profile fetched.', payload);
+};
 
 const updateProfile = async (req, res, next) => {
   try {
