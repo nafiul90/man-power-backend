@@ -6,11 +6,20 @@ const { resolveWardIds } = require('../../utils/geoScope');
 
 const LEVELS = Group.LEVELS;
 
+// Map a geo admin role → (territory key on geoScope, query key on Group)
+const ROLE_TERRITORY = {
+  'Division Admin': { territoryKey: 'divisionId', queryKey: 'division' },
+  'District Admin': { territoryKey: 'districtId', queryKey: 'district' },
+  'Upazila Admin':  { territoryKey: 'upazilaId',  queryKey: 'upazila'  },
+  'Thana Admin':    { territoryKey: 'thanaId',    queryKey: 'thana'    },
+  'Union Admin':    { territoryKey: 'unionId',    queryKey: 'union'    },
+};
+
 /**
  * Build a MongoDB constraint capturing the geo scope of a geo admin role.
  * Each role sees groups at their level OR below, within their territory.
- * For non-Ward admins, falls back to ward-in-territory so legacy ward-level
- * groups (without denormalized ancestors) still show up.
+ * For non-Ward admins, falls back to ward-in-territory so ward-level groups
+ * (without denormalized ancestors) still show up.
  *
  * Returns null for non geo admins (no restriction).
  * Returns false (sentinel) when the admin has no assigned area.
@@ -24,9 +33,8 @@ const buildGeoScopeConstraint = async (reqUser) => {
     return { level: 'Ward', ward: { $in: wardIds } };
   }
 
-  if (role === 'District Admin' || role === 'Upazila Admin' || role === 'Union Admin') {
-    const territoryKey = role === 'District Admin' ? 'districtId' : role === 'Upazila Admin' ? 'upazilaId' : 'unionId';
-    const queryKey = role === 'District Admin' ? 'district' : role === 'Upazila Admin' ? 'upazila' : 'union';
+  if (ROLE_TERRITORY[role]) {
+    const { territoryKey, queryKey } = ROLE_TERRITORY[role];
     if (!geoScope?.[territoryKey]) return false;
     const wardIds = await resolveWardIds(reqUser);
     const or = [{ [queryKey]: geoScope[territoryKey] }];
@@ -38,41 +46,42 @@ const buildGeoScopeConstraint = async (reqUser) => {
 
 /**
  * Resolve and denormalize the geographic ancestry of a group from its
- * level + chosen area. For ward groups, derive division/district/upazila/union
- * from the ward record. For non-ward groups, derive ancestors from the AdminArea.
+ * level + chosen area. For ward groups, derive division/district/upazila/thana/union
+ * from the ward record. For non-ward groups, derive ancestors from the AdminArea chain.
  */
-const resolveAncestry = async ({ level, division, district, upazila, union, ward, orgId }) => {
+const resolveAncestry = async ({ level, division, district, upazila, thana, union, ward, orgId }) => {
   if (!LEVELS.includes(level)) {
     throw { statusCode: 400, message: 'Invalid group level.' };
   }
 
   if (level === 'Ward') {
     if (!ward) throw { statusCode: 400, message: 'Ward is required for ward-level groups.' };
-    const w = await Ward.findOne({ _id: ward, org: orgId }).select('division district upazila union');
+    const w = await Ward.findOne({ _id: ward, org: orgId }).select('division district upazila thana union');
     if (!w) throw { statusCode: 400, message: 'Ward not found in your organization.' };
     return {
       level,
       division: w.division ?? null,
       district: w.district ?? null,
       upazila: w.upazila ?? null,
+      thana: w.thana ?? null,
       union: w.union ?? null,
       ward: w._id,
     };
   }
 
   const requiredField = level.toLowerCase();
-  const areaId = { division, district, upazila, union }[requiredField];
+  const areaId = { division, district, upazila, thana, union }[requiredField];
   if (!areaId) throw { statusCode: 400, message: `${level} selection is required.` };
 
   const area = await AdminArea.findOne({ _id: areaId, type: level, org: orgId }).select('parent');
   if (!area) throw { statusCode: 400, message: `${level} not found in your organization.` };
 
-  const ancestry = { level, division: null, district: null, upazila: null, union: null, ward: null };
+  const ancestry = { level, division: null, district: null, upazila: null, thana: null, union: null, ward: null };
   ancestry[requiredField] = area._id;
 
-  // Walk up parents to fill ancestors
+  // Walk up parents to fill ancestors. Order from below to above.
+  const types = ['Union', 'Thana', 'Upazila', 'District', 'Division'];
   let cursor = area;
-  const types = ['Union', 'Upazila', 'District', 'Division'];
   for (let i = types.indexOf(level) + 1; i < types.length && cursor?.parent; i++) {
     const parent = await AdminArea.findById(cursor.parent).select('parent type');
     if (!parent) break;
@@ -87,17 +96,10 @@ const resolveAncestry = async ({ level, division, district, upazila, union, ward
  */
 const assertAncestryInScope = (reqUser, ancestry) => {
   const { role, geoScope } = reqUser;
-  if (role === 'District Admin') {
-    if (String(ancestry.district) !== String(geoScope?.districtId)) {
-      throw { statusCode: 403, message: 'Group is outside your district.' };
-    }
-  } else if (role === 'Upazila Admin') {
-    if (String(ancestry.upazila) !== String(geoScope?.upazilaId)) {
-      throw { statusCode: 403, message: 'Group is outside your upazila.' };
-    }
-  } else if (role === 'Union Admin') {
-    if (String(ancestry.union) !== String(geoScope?.unionId)) {
-      throw { statusCode: 403, message: 'Group is outside your union.' };
+  if (ROLE_TERRITORY[role]) {
+    const { territoryKey, queryKey } = ROLE_TERRITORY[role];
+    if (String(ancestry[queryKey]) !== String(geoScope?.[territoryKey])) {
+      throw { statusCode: 403, message: `Group is outside your ${queryKey}.` };
     }
   } else if (role === 'Ward Admin') {
     const wardIds = (geoScope?.wardIds ?? []).map(String);
@@ -109,7 +111,7 @@ const assertAncestryInScope = (reqUser, ancestry) => {
 
 const getAll = async (
   reqUser,
-  { page = 1, limit = 20, search, orgId, level, division, district, upazila, union, wardId, category }
+  { page = 1, limit = 20, search, orgId, level, division, district, upazila, thana, union, wardId, category }
 ) => {
   const orgFilter = buildOrgFilter(reqUser, orgId);
   const query = { ...orgFilter };
@@ -133,6 +135,7 @@ const getAll = async (
   if (division) query.division = division;
   if (district) query.district = district;
   if (upazila) query.upazila = upazila;
+  if (thana) query.thana = thana;
   if (union) query.union = union;
   if (wardId) query.ward = wardId;
 
@@ -142,6 +145,7 @@ const getAll = async (
       .populate('division', 'name')
       .populate('district', 'name')
       .populate('upazila', 'name')
+      .populate('thana', 'name')
       .populate('union', 'name')
       .populate('ward', 'title')
       .populate('category', 'title')
@@ -172,6 +176,7 @@ const getById = async (id, reqUser) => {
     .populate('division', 'name')
     .populate('district', 'name')
     .populate('upazila', 'name')
+    .populate('thana', 'name')
     .populate('union', 'name')
     .populate('ward', 'title')
     .populate('category', 'title')
@@ -191,6 +196,7 @@ const create = async (reqUser, data) => {
     division: data.division,
     district: data.district,
     upazila: data.upazila,
+    thana: data.thana,
     union: data.union,
     ward: data.ward,
     orgId: orgFilter.org,
@@ -230,13 +236,13 @@ const update = async (id, reqUser, data) => {
     ...(data.secretaries !== undefined ? { secretaries: data.secretaries } : {}),
   };
 
-  // If level/area is being changed, re-resolve ancestry and re-check scope
   if (data.level !== undefined) {
     const ancestry = await resolveAncestry({
       level: data.level,
       division: data.division,
       district: data.district,
       upazila: data.upazila,
+      thana: data.thana,
       union: data.union,
       ward: data.ward,
       orgId: orgFilter.org,
@@ -253,6 +259,7 @@ const update = async (id, reqUser, data) => {
     .populate('division', 'name')
     .populate('district', 'name')
     .populate('upazila', 'name')
+    .populate('thana', 'name')
     .populate('union', 'name')
     .populate('ward', 'title')
     .populate('category', 'title')
@@ -283,6 +290,7 @@ const updateAssignees = async (id, reqUser, { teamLeaders, secretaries }) => {
     .populate('division', 'name')
     .populate('district', 'name')
     .populate('upazila', 'name')
+    .populate('thana', 'name')
     .populate('union', 'name')
     .populate('ward', 'title')
     .populate('category', 'title')

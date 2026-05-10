@@ -22,22 +22,33 @@ const restrictSuperAdminRole = (req, res, next) => {
   next();
 };
 
-// Ward Admin and geo admins can only create/assign lower roles
+// Each creator role can assign only roles below their level in the hierarchy.
+// Hierarchy (high → low): Super Admin > Org Owner > Manager > Division Admin
+//   > District Admin > Upazila Admin > Thana Admin > Union Admin > Ward Admin
+//   > Team Leader / Secretary / Instructor / Accountant > Member
+const LEAF_ROLES = ['Team Leader', 'Secretary', 'Instructor', 'Accountant', 'Member'];
+
 const ALLOWED_ASSIGN_ROLES = {
-  'Manager': ['Team Leader', 'Secretary', 'Instructor', 'Member'],
-  'Ward Admin': ['Team Leader', 'Secretary', 'Instructor', 'Member'],
-  'District Admin': ['Team Leader', 'Secretary', 'Instructor', 'Member', 'Ward Admin', 'Union Admin'],
-  'Upazila Admin': ['Team Leader', 'Secretary', 'Instructor', 'Member', 'Ward Admin', 'Union Admin'],
-  'Union Admin': ['Team Leader', 'Secretary', 'Instructor', 'Member', 'Ward Admin'],
+  'Super Admin':    ['Org Owner', 'Manager', 'Division Admin', 'District Admin', 'Upazila Admin', 'Thana Admin', 'Union Admin', 'Ward Admin', ...LEAF_ROLES, 'Super Admin'],
+  'Org Owner':      ['Manager', 'Division Admin', 'District Admin', 'Upazila Admin', 'Thana Admin', 'Union Admin', 'Ward Admin', ...LEAF_ROLES],
+  'Manager':        [...LEAF_ROLES],
+  'Division Admin': ['District Admin', 'Upazila Admin', 'Thana Admin', 'Union Admin', 'Ward Admin', ...LEAF_ROLES],
+  'District Admin': ['Upazila Admin', 'Thana Admin', 'Union Admin', 'Ward Admin', ...LEAF_ROLES],
+  'Upazila Admin':  ['Thana Admin', 'Union Admin', 'Ward Admin', ...LEAF_ROLES],
+  'Thana Admin':    ['Union Admin', 'Ward Admin', ...LEAF_ROLES],
+  'Union Admin':    ['Ward Admin', ...LEAF_ROLES],
+  'Ward Admin':     [...LEAF_ROLES],
+  'Team Leader':    ['Member'],
+  'Secretary':      ['Member'],
 };
 
 const restrictRoleAssignment = (req, res, next) => {
   const actorRole = req.user.role;
   const targetRole = req.body.role;
-  if (targetRole && ALLOWED_ASSIGN_ROLES[actorRole]) {
-    if (!ALLOWED_ASSIGN_ROLES[actorRole].includes(targetRole)) {
-      return sendError(res, 403, `${actorRole} cannot assign role: ${targetRole}.`);
-    }
+  if (!targetRole) return next();
+  const allowed = ALLOWED_ASSIGN_ROLES[actorRole];
+  if (!allowed || !allowed.includes(targetRole)) {
+    return sendError(res, 403, `${actorRole} cannot assign role: ${targetRole}.`);
   }
   next();
 };
@@ -51,13 +62,15 @@ router.patch('/me', authenticate, updateUserValidator, validate, controller.upda
 router.patch('/me/change-password', authenticate, changeOwnPasswordValidator, validate, controller.changeOwnPassword);
 
 // Admin routes
-const adminRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
+const adminRoles = ['Super Admin', 'Org Owner', 'Manager', 'Division Admin', 'District Admin', 'Upazila Admin', 'Thana Admin', 'Union Admin', 'Ward Admin'];
 const readRoles = [...adminRoles, 'Instructor', 'Team Leader', 'Secretary'];
-const manageRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
-const raterRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
+const manageRoles = [...adminRoles];
+// Roles allowed to create users — Team Leader & Secretary may create Members per role hierarchy.
+const createRoles = [...manageRoles, 'Team Leader', 'Secretary'];
+const raterRoles = [...adminRoles];
 
 router.get('/', authenticate, authorize(...readRoles), controller.getAllUsers);
-router.post('/', authenticate, authorize(...manageRoles), restrictSuperAdminRole, restrictRoleAssignment, createUserValidator, validate, controller.createUser);
+router.post('/', authenticate, authorize(...createRoles), restrictSuperAdminRole, restrictRoleAssignment, createUserValidator, validate, controller.createUser);
 router.get('/:id/stats', authenticate, authorize(...adminRoles, 'Instructor'), controller.getMemberStats);
 router.get('/:id', authenticate, authorize(...adminRoles, 'Instructor'), controller.getUserById);
 router.put('/:id', authenticate, authorize(...manageRoles), restrictSuperAdminRole, restrictRoleAssignment, updateUserValidator, validate, controller.updateUser);

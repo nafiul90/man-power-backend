@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const GROUP_LEVELS = ['Division', 'District', 'Upazila', 'Union', 'Ward'];
+const GROUP_LEVELS = ['Division', 'District', 'Upazila', 'Thana', 'Union', 'Ward'];
 
 const groupSchema = new mongoose.Schema(
   {
@@ -18,6 +18,7 @@ const groupSchema = new mongoose.Schema(
     division: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminArea', default: null },
     district: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminArea', default: null },
     upazila: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminArea', default: null },
+    thana: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminArea', default: null },
     union: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminArea', default: null },
     ward: {
       type: mongoose.Schema.Types.ObjectId,
@@ -46,6 +47,7 @@ groupSchema.index({ title: 1, org: 1 }, { unique: true });
 groupSchema.index({ level: 1, org: 1 });
 groupSchema.index({ district: 1 });
 groupSchema.index({ upazila: 1 });
+groupSchema.index({ thana: 1 });
 groupSchema.index({ union: 1 });
 
 const Group = mongoose.model('Group', groupSchema);

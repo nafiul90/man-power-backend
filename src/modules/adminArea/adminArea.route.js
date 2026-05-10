@@ -8,12 +8,13 @@ const router = express.Router();
 
 const areaValidator = [
   body('name').trim().notEmpty().withMessage('Name is required.'),
-  body('type').isIn(['Division', 'District', 'Upazila', 'Union']).withMessage('Invalid type.'),
+  body('type').isIn(['Division', 'District', 'Upazila', 'Thana', 'Union']).withMessage('Invalid type.'),
   body('admins').optional().isArray().withMessage('admins must be an array.'),
 ];
 
-const writeRoles = ['Super Admin', 'Org Owner'];
-const readRoles = [...writeRoles, 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin', 'Team Leader', 'Secretary'];
+// Scope checks happen in the service; route-level just gates the HTTP layer.
+const writeRoles = ['Super Admin', 'Org Owner', 'Manager', 'Division Admin', 'District Admin', 'Upazila Admin', 'Thana Admin'];
+const readRoles = [...writeRoles, 'Union Admin', 'Ward Admin', 'Team Leader', 'Secretary'];
 
 router.use(authenticate);
 router.get('/', authorize(...readRoles), controller.getAll);

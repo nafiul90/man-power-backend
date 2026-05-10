@@ -183,7 +183,7 @@ const getUserById = async (id, reqUser) => {
 const createUser = async (reqUser, data) => {
   const org = reqUser.role === 'Super Admin' ? (data.org || null) : (reqUser.org || null);
   const { groupId, ...userData } = data;
-  const user = await User.create({ ...userData, org });
+  const user = await User.create({ ...userData, org, createdBy: reqUser._id });
 
   if (groupId) {
     await Group.findOneAndUpdate(

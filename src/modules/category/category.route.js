@@ -8,7 +8,7 @@ const router = express.Router();
 
 const titleValidator = [body('title').trim().notEmpty().withMessage('Title is required.')];
 const writeRoles = ['Super Admin', 'Org Owner', 'Manager', 'Ward Admin'];
-const readRoles = [...writeRoles, 'District Admin', 'Upazila Admin', 'Union Admin', 'Team Leader', 'Secretary', 'Instructor', 'Member'];
+const readRoles = [...writeRoles, 'Division Admin', 'District Admin', 'Upazila Admin', 'Thana Admin', 'Union Admin', 'Team Leader', 'Secretary', 'Instructor', 'Member'];
 
 router.use(authenticate);
 router.get('/', authorize(...readRoles), controller.getAll);

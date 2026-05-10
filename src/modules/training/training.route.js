@@ -12,8 +12,8 @@ const trainingValidator = [
   body('purpose').optional().trim(),
 ];
 
-const readRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin', 'Team Leader', 'Secretary', 'Instructor'];
-const writeRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
+const readRoles = ['Super Admin', 'Org Owner', 'Manager', 'Division Admin', 'District Admin', 'Upazila Admin', 'Thana Admin', 'Union Admin', 'Ward Admin', 'Team Leader', 'Secretary', 'Instructor'];
+const writeRoles = ['Super Admin', 'Org Owner', 'Manager', 'Division Admin', 'District Admin', 'Upazila Admin', 'Thana Admin', 'Union Admin', 'Ward Admin'];
 
 router.use(authenticate);
 router.get('/', authorize(...readRoles), controller.getAll);

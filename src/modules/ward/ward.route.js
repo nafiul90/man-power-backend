@@ -11,12 +11,14 @@ const wardValidator = [
   body('division').optional({ nullable: true }).isMongoId().withMessage('Invalid division ID.'),
   body('district').optional({ nullable: true }).isMongoId().withMessage('Invalid district ID.'),
   body('upazila').optional({ nullable: true }).isMongoId().withMessage('Invalid upazila ID.'),
+  body('thana').optional({ nullable: true }).isMongoId().withMessage('Invalid thana ID.'),
   body('union').optional({ nullable: true }).isMongoId().withMessage('Invalid union ID.'),
   body('admins').optional().isArray().withMessage('admins must be an array.'),
 ];
 
-const writeRoles = ['Super Admin', 'Org Owner'];
-const readRoles = [...writeRoles, 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin', 'Team Leader', 'Secretary'];
+// Scope checks happen in the service for geo admins.
+const writeRoles = ['Super Admin', 'Org Owner', 'Manager', 'Division Admin', 'District Admin', 'Upazila Admin', 'Thana Admin', 'Union Admin'];
+const readRoles = [...writeRoles, 'Ward Admin', 'Team Leader', 'Secretary'];
 
 router.use(authenticate);
 router.get('/', authorize(...readRoles), controller.getAll);

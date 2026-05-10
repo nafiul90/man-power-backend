@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const AREA_TYPES = ['Division', 'District', 'Upazila', 'Union'];
+const AREA_TYPES = ['Division', 'District', 'Upazila', 'Thana', 'Union'];
 
 const adminAreaSchema = new mongoose.Schema(
   {

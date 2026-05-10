@@ -11,8 +11,10 @@ const ROLES = [
   "Member",
   "Team Leader",
   "Secretary",
+  "Division Admin",
   "District Admin",
   "Upazila Admin",
+  "Thana Admin",
   "Union Admin",
   "Ward Admin",
 ];
@@ -62,6 +64,11 @@ const userSchema = new mongoose.Schema(
     org: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Organization",
+      default: null,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       default: null,
     },
     directRatings: [

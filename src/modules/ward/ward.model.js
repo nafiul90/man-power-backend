@@ -22,6 +22,11 @@ const wardSchema = new mongoose.Schema(
       ref: 'AdminArea',
       default: null,
     },
+    thana: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AdminArea',
+      default: null,
+    },
     union: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'AdminArea',

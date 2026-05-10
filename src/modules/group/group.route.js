@@ -8,18 +8,19 @@ const router = express.Router();
 
 const groupValidator = [
   body('title').trim().notEmpty().withMessage('Group title is required.'),
-  body('level').isIn(['Division', 'District', 'Upazila', 'Union', 'Ward']).withMessage('Invalid group level.'),
+  body('level').isIn(['Division', 'District', 'Upazila', 'Thana', 'Union', 'Ward']).withMessage('Invalid group level.'),
   body('division').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid division ID.'),
   body('district').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid district ID.'),
   body('upazila').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid upazila ID.'),
+  body('thana').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid thana ID.'),
   body('union').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid union ID.'),
   body('ward').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid ward ID.'),
   body('category').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Invalid category ID.'),
   body('members').optional().isArray().withMessage('Members must be an array.'),
 ];
 
-const writeRoles = ['Super Admin', 'Org Owner', 'Manager', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
-const readRoles = [...writeRoles, 'Manager', 'Instructor', 'Team Leader', 'Secretary', 'District Admin', 'Upazila Admin', 'Union Admin', 'Ward Admin'];
+const writeRoles = ['Super Admin', 'Org Owner', 'Manager', 'Division Admin', 'District Admin', 'Upazila Admin', 'Thana Admin', 'Union Admin', 'Ward Admin'];
+const readRoles = [...writeRoles, 'Instructor', 'Team Leader', 'Secretary'];
 
 router.use(authenticate);
 
