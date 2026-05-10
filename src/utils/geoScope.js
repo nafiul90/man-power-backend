@@ -7,66 +7,88 @@ const GEO_ADMIN_ROLES = ['Division Admin', 'District Admin', 'Upazila Admin', 'T
 
 const isGeoAdmin = (role) => GEO_ADMIN_ROLES.includes(role);
 
+const dedupe = (ids) => {
+  const seen = new Set();
+  const out = [];
+  for (const id of ids) {
+    if (!id) continue;
+    const k = String(id);
+    if (!seen.has(k)) { seen.add(k); out.push(id); }
+  }
+  return out;
+};
+
 /**
- * Resolves the geographic scope for a geo-admin user by looking up their assigned area.
- * Called once per request in auth middleware and cached on req.user.geoScope.
+ * Resolves the geographic scope for a geo-admin user. Each user may be admin of
+ * multiple areas at their level — every level returns an ARRAY of IDs.
  *
  * Hierarchy: Division → District → Upazila → Thana → Union → Ward
  *
- * Returns an object with the IDs of their assigned area and ancestors:
- *  - Division Admin: { divisionId }
- *  - District Admin: { districtId, divisionId }
- *  - Upazila Admin:  { upazilaId, districtId, divisionId }
- *  - Thana Admin:    { thanaId, upazilaId, districtId, divisionId }
- *  - Union Admin:    { unionId, thanaId, upazilaId, districtId, divisionId }
- *  - Ward Admin:     { wardIds: [] }
+ * Returned shape:
+ *  - Division Admin: { divisionIds }
+ *  - District Admin: { districtIds, divisionIds }
+ *  - Upazila Admin:  { upazilaIds, districtIds, divisionIds }
+ *  - Thana Admin:    { thanaIds, upazilaIds, districtIds, divisionIds }
+ *  - Union Admin:    { unionIds, thanaIds, upazilaIds, districtIds, divisionIds }
+ *  - Ward Admin:     { wardIds }
  */
 const resolveGeoScope = async (user) => {
   const orgId = user.org?._id ?? user.org;
   const userId = user._id;
 
+  const findAreas = (type) => AdminArea.find({ type, admins: userId, org: orgId }).select('_id parent');
+  const fetchParents = async (children) => {
+    const parentIds = dedupe(children.map((c) => c.parent).filter(Boolean));
+    if (!parentIds.length) return [];
+    return AdminArea.find({ _id: { $in: parentIds }, org: orgId }).select('_id parent');
+  };
+
   if (user.role === 'Division Admin') {
-    const area = await AdminArea.findOne({ type: 'Division', admins: userId, org: orgId }).select('_id');
-    return { divisionId: area?._id ?? null };
+    const divisions = await findAreas('Division');
+    return { divisionIds: divisions.map((d) => d._id) };
   }
 
   if (user.role === 'District Admin') {
-    const area = await AdminArea.findOne({ type: 'District', admins: userId, org: orgId }).select('_id parent');
-    return { districtId: area?._id ?? null, divisionId: area?.parent ?? null };
+    const districts = await findAreas('District');
+    return {
+      districtIds: districts.map((d) => d._id),
+      divisionIds: dedupe(districts.map((d) => d.parent).filter(Boolean)),
+    };
   }
 
   if (user.role === 'Upazila Admin') {
-    const area = await AdminArea.findOne({ type: 'Upazila', admins: userId, org: orgId }).select('_id parent');
-    if (!area) return { upazilaId: null, districtId: null, divisionId: null };
-    const district = await AdminArea.findById(area.parent).select('_id parent');
-    return { upazilaId: area._id, districtId: district?._id ?? null, divisionId: district?.parent ?? null };
+    const upazilas = await findAreas('Upazila');
+    const districts = await fetchParents(upazilas);
+    return {
+      upazilaIds: upazilas.map((u) => u._id),
+      districtIds: districts.map((d) => d._id),
+      divisionIds: dedupe(districts.map((d) => d.parent).filter(Boolean)),
+    };
   }
 
   if (user.role === 'Thana Admin') {
-    const thana = await AdminArea.findOne({ type: 'Thana', admins: userId, org: orgId }).select('_id parent');
-    if (!thana) return { thanaId: null, upazilaId: null, districtId: null, divisionId: null };
-    const upazila = await AdminArea.findById(thana.parent).select('_id parent');
-    const district = upazila ? await AdminArea.findById(upazila.parent).select('_id parent') : null;
+    const thanas = await findAreas('Thana');
+    const upazilas = await fetchParents(thanas);
+    const districts = await fetchParents(upazilas);
     return {
-      thanaId: thana._id,
-      upazilaId: upazila?._id ?? null,
-      districtId: district?._id ?? null,
-      divisionId: district?.parent ?? null,
+      thanaIds: thanas.map((t) => t._id),
+      upazilaIds: upazilas.map((u) => u._id),
+      districtIds: districts.map((d) => d._id),
+      divisionIds: dedupe(districts.map((d) => d.parent).filter(Boolean)),
     };
   }
 
   if (user.role === 'Union Admin') {
-    const union = await AdminArea.findOne({ type: 'Union', admins: userId, org: orgId }).select('_id parent');
-    if (!union) return { unionId: null, thanaId: null, upazilaId: null, districtId: null, divisionId: null };
-    const thana = await AdminArea.findById(union.parent).select('_id parent');
-    const upazila = thana ? await AdminArea.findById(thana.parent).select('_id parent') : null;
-    const district = upazila ? await AdminArea.findById(upazila.parent).select('_id parent') : null;
+    const unions = await findAreas('Union');
+    const thanas = await fetchParents(unions);
+    const upazilas = await fetchParents(thanas);
+    const districts = await fetchParents(upazilas);
     return {
-      unionId: union._id,
-      thanaId: thana?._id ?? null,
-      upazilaId: upazila?._id ?? null,
-      districtId: district?._id ?? null,
-      divisionId: district?.parent ?? null,
+      unionIds: unions.map((u) => u._id),
+      thanaIds: thanas.map((t) => t._id),
+      upazilaIds: upazilas.map((u) => u._id),
+      districtIds: districts.map((d) => d._id),
+      divisionIds: dedupe(districts.map((d) => d.parent).filter(Boolean)),
     };
   }
 
@@ -93,21 +115,19 @@ const resolveWardIds = async (reqUser) => {
   if (role === 'Ward Admin') return geoScope.wardIds ?? [];
 
   const filter = { org: orgId };
-  if (role === 'Union Admin') filter.union = geoScope.unionId;
-  else if (role === 'Thana Admin') filter.thana = geoScope.thanaId;
-  else if (role === 'Upazila Admin') filter.upazila = geoScope.upazilaId;
-  else if (role === 'District Admin') filter.district = geoScope.districtId;
-  else if (role === 'Division Admin') filter.division = geoScope.divisionId;
+  if (role === 'Union Admin')   filter.union    = { $in: geoScope.unionIds   ?? [] };
+  else if (role === 'Thana Admin') filter.thana    = { $in: geoScope.thanaIds    ?? [] };
+  else if (role === 'Upazila Admin') filter.upazila = { $in: geoScope.upazilaIds ?? [] };
+  else if (role === 'District Admin') filter.district = { $in: geoScope.districtIds ?? [] };
+  else if (role === 'Division Admin') filter.division = { $in: geoScope.divisionIds ?? [] };
 
   const wards = await Ward.find(filter).select('_id');
   return wards.map((w) => w._id);
 };
 
 /**
- * Returns user IDs in a geo-admin's scope:
- *  - members / teamLeaders / secretaries of groups in their territory
- *  - admins of wards in scope
- *  - admins of AdminArea(s) within scope
+ * Returns user IDs in a geo-admin's scope (members, ward admins, area admins,
+ * plus any users transitively created by anyone already in scope).
  *
  * Returns null for non-geo admins (no restriction).
  * Returns [] if the admin has no assigned area.
@@ -126,76 +146,70 @@ const resolveGeoUserIds = async (reqUser) => {
     wardIds = geoScope.wardIds ?? [];
   } else {
     const filter = { org: orgId };
-    if (role === 'Union Admin') filter.union = geoScope.unionId;
-    else if (role === 'Thana Admin') filter.thana = geoScope.thanaId;
-    else if (role === 'Upazila Admin') filter.upazila = geoScope.upazilaId;
-    else if (role === 'District Admin') filter.district = geoScope.districtId;
-    else if (role === 'Division Admin') filter.division = geoScope.divisionId;
+    if (role === 'Union Admin')   filter.union    = { $in: geoScope.unionIds   ?? [] };
+    else if (role === 'Thana Admin') filter.thana    = { $in: geoScope.thanaIds    ?? [] };
+    else if (role === 'Upazila Admin') filter.upazila = { $in: geoScope.upazilaIds ?? [] };
+    else if (role === 'District Admin') filter.district = { $in: geoScope.districtIds ?? [] };
+    else if (role === 'Division Admin') filter.division = { $in: geoScope.divisionIds ?? [] };
 
     const wards = await Ward.find(filter).select('_id admins');
     wardIds = wards.map((w) => w._id);
     wards.forEach((w) => w.admins.forEach((id) => userIds.add(String(id))));
   }
 
-  // --- collect group members in scope (ward-level + level-specific groups) ---
+  // --- collect group members in scope ---
   const groupOr = [{ ward: { $in: wardIds } }];
-  if (role === 'Union Admin' && geoScope.unionId) groupOr.push({ union: geoScope.unionId });
-  else if (role === 'Thana Admin' && geoScope.thanaId) groupOr.push({ thana: geoScope.thanaId });
-  else if (role === 'Upazila Admin' && geoScope.upazilaId) groupOr.push({ upazila: geoScope.upazilaId });
-  else if (role === 'District Admin' && geoScope.districtId) groupOr.push({ district: geoScope.districtId });
-  else if (role === 'Division Admin' && geoScope.divisionId) groupOr.push({ division: geoScope.divisionId });
-  const groups = await Group.find({ org: orgId, $or: groupOr }).select(
-    'members teamLeaders secretaries',
-  );
+  if (role === 'Union Admin' && geoScope.unionIds?.length) groupOr.push({ union: { $in: geoScope.unionIds } });
+  else if (role === 'Thana Admin' && geoScope.thanaIds?.length) groupOr.push({ thana: { $in: geoScope.thanaIds } });
+  else if (role === 'Upazila Admin' && geoScope.upazilaIds?.length) groupOr.push({ upazila: { $in: geoScope.upazilaIds } });
+  else if (role === 'District Admin' && geoScope.districtIds?.length) groupOr.push({ district: { $in: geoScope.districtIds } });
+  else if (role === 'Division Admin' && geoScope.divisionIds?.length) groupOr.push({ division: { $in: geoScope.divisionIds } });
+  const groups = await Group.find({ org: orgId, $or: groupOr }).select('members teamLeaders secretaries');
   groups.forEach((g) => {
     g.members.forEach((id) => userIds.add(String(id)));
     g.teamLeaders.forEach((id) => userIds.add(String(id)));
     g.secretaries.forEach((id) => userIds.add(String(id)));
   });
 
-  // --- collect AdminArea admins within scope ---
+  // --- collect AdminArea admins within scope (walk down the hierarchy) ---
   const collectAdmins = (areas) => areas.forEach((a) => a.admins.forEach((id) => userIds.add(String(id))));
 
-  if (role === 'Union Admin' && geoScope.unionId) {
-    const a = await AdminArea.findById(geoScope.unionId).select('admins');
-    if (a) a.admins.forEach((id) => userIds.add(String(id)));
-  } else if (role === 'Thana Admin' && geoScope.thanaId) {
-    const [thana, unions] = await Promise.all([
-      AdminArea.findById(geoScope.thanaId).select('admins'),
-      AdminArea.find({ type: 'Union', parent: geoScope.thanaId, org: orgId }).select('admins'),
+  if (role === 'Union Admin' && geoScope.unionIds?.length) {
+    const areas = await AdminArea.find({ _id: { $in: geoScope.unionIds }, org: orgId }).select('admins');
+    collectAdmins(areas);
+  } else if (role === 'Thana Admin' && geoScope.thanaIds?.length) {
+    const [thanas, unions] = await Promise.all([
+      AdminArea.find({ _id: { $in: geoScope.thanaIds }, org: orgId }).select('admins'),
+      AdminArea.find({ type: 'Union', parent: { $in: geoScope.thanaIds }, org: orgId }).select('admins'),
     ]);
-    if (thana) thana.admins.forEach((id) => userIds.add(String(id)));
-    collectAdmins(unions);
-  } else if (role === 'Upazila Admin' && geoScope.upazilaId) {
-    const [upazila, thanas] = await Promise.all([
-      AdminArea.findById(geoScope.upazilaId).select('admins'),
-      AdminArea.find({ type: 'Thana', parent: geoScope.upazilaId, org: orgId }).select('_id admins'),
+    collectAdmins(thanas); collectAdmins(unions);
+  } else if (role === 'Upazila Admin' && geoScope.upazilaIds?.length) {
+    const [upazilas, thanas] = await Promise.all([
+      AdminArea.find({ _id: { $in: geoScope.upazilaIds }, org: orgId }).select('admins'),
+      AdminArea.find({ type: 'Thana', parent: { $in: geoScope.upazilaIds }, org: orgId }).select('_id admins'),
     ]);
-    if (upazila) upazila.admins.forEach((id) => userIds.add(String(id)));
-    collectAdmins(thanas);
+    collectAdmins(upazilas); collectAdmins(thanas);
     const thanaIds = thanas.map((t) => t._id);
     const unions = await AdminArea.find({ type: 'Union', parent: { $in: thanaIds }, org: orgId }).select('admins');
     collectAdmins(unions);
-  } else if (role === 'District Admin' && geoScope.districtId) {
-    const [district, upazilas] = await Promise.all([
-      AdminArea.findById(geoScope.districtId).select('admins'),
-      AdminArea.find({ type: 'Upazila', parent: geoScope.districtId, org: orgId }).select('_id admins'),
+  } else if (role === 'District Admin' && geoScope.districtIds?.length) {
+    const [districts, upazilas] = await Promise.all([
+      AdminArea.find({ _id: { $in: geoScope.districtIds }, org: orgId }).select('admins'),
+      AdminArea.find({ type: 'Upazila', parent: { $in: geoScope.districtIds }, org: orgId }).select('_id admins'),
     ]);
-    if (district) district.admins.forEach((id) => userIds.add(String(id)));
-    collectAdmins(upazilas);
+    collectAdmins(districts); collectAdmins(upazilas);
     const upazilaIds = upazilas.map((u) => u._id);
     const thanas = await AdminArea.find({ type: 'Thana', parent: { $in: upazilaIds }, org: orgId }).select('_id admins');
     collectAdmins(thanas);
     const thanaIds = thanas.map((t) => t._id);
     const unions = await AdminArea.find({ type: 'Union', parent: { $in: thanaIds }, org: orgId }).select('admins');
     collectAdmins(unions);
-  } else if (role === 'Division Admin' && geoScope.divisionId) {
-    const [division, districts] = await Promise.all([
-      AdminArea.findById(geoScope.divisionId).select('admins'),
-      AdminArea.find({ type: 'District', parent: geoScope.divisionId, org: orgId }).select('_id admins'),
+  } else if (role === 'Division Admin' && geoScope.divisionIds?.length) {
+    const [divisions, districts] = await Promise.all([
+      AdminArea.find({ _id: { $in: geoScope.divisionIds }, org: orgId }).select('admins'),
+      AdminArea.find({ type: 'District', parent: { $in: geoScope.divisionIds }, org: orgId }).select('_id admins'),
     ]);
-    if (division) division.admins.forEach((id) => userIds.add(String(id)));
-    collectAdmins(districts);
+    collectAdmins(divisions); collectAdmins(districts);
     const districtIds = districts.map((d) => d._id);
     const upazilas = await AdminArea.find({ type: 'Upazila', parent: { $in: districtIds }, org: orgId }).select('_id admins');
     collectAdmins(upazilas);
@@ -207,9 +221,7 @@ const resolveGeoUserIds = async (reqUser) => {
     collectAdmins(unions);
   }
 
-  // --- transitively pull in users created by anyone already in scope ---
-  // Covers freshly-created sub-admins who haven't been linked to a ward / area / group yet.
-  // BFS through `createdBy`; each iteration adds users created by the current frontier.
+  // --- transitively pull in users created by anyone in scope (BFS via createdBy) ---
   let frontier = [...userIds];
   for (let depth = 0; depth < 8 && frontier.length > 0; depth++) {
     const created = await User.find({ createdBy: { $in: frontier }, org: orgId }).select('_id');

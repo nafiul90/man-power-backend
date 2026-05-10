@@ -11,8 +11,15 @@ const ALLOWED_CREATE_TYPES = {
   'Upazila Admin':  ['Thana', 'Union'],
   'Thana Admin':    ['Union'],
 };
-// Roles with no geo restriction on writes (must still respect ALLOWED_CREATE_TYPES if listed).
 const UNRESTRICTED_WRITE_ROLES = new Set(['Super Admin', 'Org Owner', 'Manager']);
+
+// Map a geo-admin role to its anchor (territory IDs key + ancestor type).
+const ROLE_ANCHOR = {
+  'Division Admin': { idsKey: 'divisionIds', anchorType: 'Division' },
+  'District Admin': { idsKey: 'districtIds', anchorType: 'District' },
+  'Upazila Admin':  { idsKey: 'upazilaIds',  anchorType: 'Upazila'  },
+  'Thana Admin':    { idsKey: 'thanaIds',    anchorType: 'Thana'    },
+};
 
 /**
  * Walk up the parent chain of `areaId` until a node of `targetType` is found.
@@ -28,10 +35,6 @@ const findAncestorOfType = async (areaId, targetType, orgId) => {
   return null;
 };
 
-/**
- * Verifies a (type, parentId) pair is within the current user's territory.
- * Throws 403 if outside scope. No-op for unrestricted roles.
- */
 const assertWriteScope = async (reqUser, { type, parent, orgId }) => {
   const { role, geoScope } = reqUser;
   if (UNRESTRICTED_WRITE_ROLES.has(role)) return;
@@ -44,21 +47,15 @@ const assertWriteScope = async (reqUser, { type, parent, orgId }) => {
     throw { statusCode: 403, message: `${role} cannot manage ${type} areas.` };
   }
 
-  // Map role → (territoryKey on geoScope, ancestor type to anchor against)
-  const anchor =
-    role === 'Division Admin' ? { idKey: 'divisionId', anchorType: 'Division' } :
-    role === 'District Admin' ? { idKey: 'districtId', anchorType: 'District' } :
-    role === 'Upazila Admin'  ? { idKey: 'upazilaId',  anchorType: 'Upazila'  } :
-    role === 'Thana Admin'    ? { idKey: 'thanaId',    anchorType: 'Thana'    } : null;
-
-  if (!anchor || !geoScope?.[anchor.idKey]) {
+  const anchor = ROLE_ANCHOR[role];
+  const territoryIds = (geoScope?.[anchor?.idsKey] ?? []).map(String);
+  if (!territoryIds.length) {
     throw { statusCode: 403, message: 'No territory assigned to your account.' };
   }
 
-  // The new area's parent (if any) must lie in the requester's territory.
   if (parent) {
     const ancestorId = await findAncestorOfType(parent, anchor.anchorType, orgId);
-    if (ancestorId !== String(geoScope[anchor.idKey])) {
+    if (!ancestorId || !territoryIds.includes(ancestorId)) {
       throw { statusCode: 403, message: `Selected parent is outside your ${anchor.anchorType.toLowerCase()}.` };
     }
   }
@@ -78,97 +75,100 @@ const getAll = async (reqUser, { type, parentId, page = 1, limit = 200, search, 
   }
 
   if (role === 'Union Admin') {
-    const { unionId } = geoScope ?? {};
-    if (!unionId) return EMPTY(page, limit);
+    const ids = geoScope?.unionIds ?? [];
+    if (!ids.length) return EMPTY(page, limit);
     if (type && type !== 'Union') return EMPTY(page, limit);
     query.type = 'Union';
-    query._id = unionId;
+    query._id = { $in: ids };
 
   } else if (role === 'Thana Admin') {
-    const { thanaId } = geoScope ?? {};
-    if (!thanaId) return EMPTY(page, limit);
+    const ids = geoScope?.thanaIds ?? [];
+    if (!ids.length) return EMPTY(page, limit);
     const requestedType = type || null;
     if (['Division', 'District', 'Upazila'].includes(requestedType)) return EMPTY(page, limit);
     if (!requestedType || requestedType === 'Thana') {
       query.type = 'Thana';
-      query._id = thanaId;
+      query._id = { $in: ids };
     } else {
-      // Union under their thana
       query.type = 'Union';
+      const idsStr = ids.map(String);
       if (parentId) {
-        if (String(parentId) !== String(thanaId)) return EMPTY(page, limit);
+        if (!idsStr.includes(String(parentId))) return EMPTY(page, limit);
         query.parent = parentId;
       } else {
-        query.parent = thanaId;
+        query.parent = { $in: ids };
       }
     }
 
   } else if (role === 'Upazila Admin') {
-    const { upazilaId } = geoScope ?? {};
-    if (!upazilaId) return EMPTY(page, limit);
+    const ids = geoScope?.upazilaIds ?? [];
+    if (!ids.length) return EMPTY(page, limit);
     const requestedType = type || null;
     if (['Division', 'District'].includes(requestedType)) return EMPTY(page, limit);
 
     if (!requestedType || requestedType === 'Upazila') {
       query.type = 'Upazila';
-      query._id = upazilaId;
+      query._id = { $in: ids };
     } else if (requestedType === 'Thana') {
       query.type = 'Thana';
+      const idsStr = ids.map(String);
       if (parentId) {
-        if (String(parentId) !== String(upazilaId)) return EMPTY(page, limit);
+        if (!idsStr.includes(String(parentId))) return EMPTY(page, limit);
         query.parent = parentId;
       } else {
-        query.parent = upazilaId;
+        query.parent = { $in: ids };
       }
     } else {
-      // Union — parent must be a thana inside this upazila
+      // Union — parent must be a thana inside one of these upazilas
       query.type = 'Union';
+      const thanas = await AdminArea.find({ type: 'Thana', parent: { $in: ids }, ...orgFilter }).select('_id');
+      const thanaIds = thanas.map((t) => t._id);
+      const thanaIdsStr = thanaIds.map(String);
       if (parentId) {
-        const thana = await AdminArea.findOne({ _id: parentId, type: 'Thana', parent: upazilaId, ...orgFilter }).select('_id');
-        if (!thana) return EMPTY(page, limit);
+        if (!thanaIdsStr.includes(String(parentId))) return EMPTY(page, limit);
         query.parent = parentId;
       } else {
-        const thanas = await AdminArea.find({ type: 'Thana', parent: upazilaId, ...orgFilter }).select('_id');
-        query.parent = { $in: thanas.map((t) => t._id) };
+        query.parent = { $in: thanaIds };
       }
     }
 
   } else if (role === 'District Admin') {
-    const { districtId } = geoScope ?? {};
-    if (!districtId) return EMPTY(page, limit);
+    const ids = geoScope?.districtIds ?? [];
+    if (!ids.length) return EMPTY(page, limit);
     const requestedType = type || null;
     if (requestedType === 'Division') return EMPTY(page, limit);
 
     if (!requestedType || requestedType === 'District') {
       query.type = 'District';
-      query._id = districtId;
+      query._id = { $in: ids };
     } else if (requestedType === 'Upazila') {
       query.type = 'Upazila';
+      const idsStr = ids.map(String);
       if (parentId) {
-        if (String(parentId) !== String(districtId)) return EMPTY(page, limit);
+        if (!idsStr.includes(String(parentId))) return EMPTY(page, limit);
         query.parent = parentId;
       } else {
-        query.parent = districtId;
+        query.parent = { $in: ids };
       }
     } else if (requestedType === 'Thana') {
       query.type = 'Thana';
+      const upazilas = await AdminArea.find({ type: 'Upazila', parent: { $in: ids }, ...orgFilter }).select('_id');
+      const upazilaIds = upazilas.map((u) => u._id);
+      const upazilaIdsStr = upazilaIds.map(String);
       if (parentId) {
-        const upazila = await AdminArea.findOne({ _id: parentId, type: 'Upazila', parent: districtId, ...orgFilter }).select('_id');
-        if (!upazila) return EMPTY(page, limit);
+        if (!upazilaIdsStr.includes(String(parentId))) return EMPTY(page, limit);
         query.parent = parentId;
       } else {
-        const upazilas = await AdminArea.find({ type: 'Upazila', parent: districtId, ...orgFilter }).select('_id');
-        query.parent = { $in: upazilas.map((u) => u._id) };
+        query.parent = { $in: upazilaIds };
       }
     } else {
-      // Union — descendants of any upazila → thana under district
       query.type = 'Union';
-      const upazilas = await AdminArea.find({ type: 'Upazila', parent: districtId, ...orgFilter }).select('_id');
+      const upazilas = await AdminArea.find({ type: 'Upazila', parent: { $in: ids }, ...orgFilter }).select('_id');
       const thanas = await AdminArea.find({ type: 'Thana', parent: { $in: upazilas.map((u) => u._id) }, ...orgFilter }).select('_id');
       const thanaIds = thanas.map((t) => t._id);
+      const thanaIdsStr = thanaIds.map(String);
       if (parentId) {
-        const ok = thanaIds.some((id) => String(id) === String(parentId));
-        if (!ok) return EMPTY(page, limit);
+        if (!thanaIdsStr.includes(String(parentId))) return EMPTY(page, limit);
         query.parent = parentId;
       } else {
         query.parent = { $in: thanaIds };
@@ -176,30 +176,30 @@ const getAll = async (reqUser, { type, parentId, page = 1, limit = 200, search, 
     }
 
   } else if (role === 'Division Admin') {
-    const { divisionId } = geoScope ?? {};
-    if (!divisionId) return EMPTY(page, limit);
+    const ids = geoScope?.divisionIds ?? [];
+    if (!ids.length) return EMPTY(page, limit);
     const requestedType = type || null;
 
     if (!requestedType || requestedType === 'Division') {
       query.type = 'Division';
-      query._id = divisionId;
+      query._id = { $in: ids };
     } else if (requestedType === 'District') {
       query.type = 'District';
+      const idsStr = ids.map(String);
       if (parentId) {
-        if (String(parentId) !== String(divisionId)) return EMPTY(page, limit);
+        if (!idsStr.includes(String(parentId))) return EMPTY(page, limit);
         query.parent = parentId;
       } else {
-        query.parent = divisionId;
+        query.parent = { $in: ids };
       }
-    } else if (requestedType === 'Upazila' || requestedType === 'Thana' || requestedType === 'Union') {
-      // Walk down: districts under division, upazilas under those, etc.
-      const districts = await AdminArea.find({ type: 'District', parent: divisionId, ...orgFilter }).select('_id');
+    } else {
+      const districts = await AdminArea.find({ type: 'District', parent: { $in: ids }, ...orgFilter }).select('_id');
       const districtIds = districts.map((d) => d._id);
       if (requestedType === 'Upazila') {
         query.type = 'Upazila';
+        const districtIdsStr = districtIds.map(String);
         if (parentId) {
-          const ok = districtIds.some((id) => String(id) === String(parentId));
-          if (!ok) return EMPTY(page, limit);
+          if (!districtIdsStr.includes(String(parentId))) return EMPTY(page, limit);
           query.parent = parentId;
         } else {
           query.parent = { $in: districtIds };
@@ -209,9 +209,9 @@ const getAll = async (reqUser, { type, parentId, page = 1, limit = 200, search, 
         const upazilaIds = upazilas.map((u) => u._id);
         if (requestedType === 'Thana') {
           query.type = 'Thana';
+          const upazilaIdsStr = upazilaIds.map(String);
           if (parentId) {
-            const ok = upazilaIds.some((id) => String(id) === String(parentId));
-            if (!ok) return EMPTY(page, limit);
+            if (!upazilaIdsStr.includes(String(parentId))) return EMPTY(page, limit);
             query.parent = parentId;
           } else {
             query.parent = { $in: upazilaIds };
@@ -221,9 +221,9 @@ const getAll = async (reqUser, { type, parentId, page = 1, limit = 200, search, 
           const thanas = await AdminArea.find({ type: 'Thana', parent: { $in: upazilaIds }, ...orgFilter }).select('_id');
           const thanaIds = thanas.map((t) => t._id);
           query.type = 'Union';
+          const thanaIdsStr = thanaIds.map(String);
           if (parentId) {
-            const ok = thanaIds.some((id) => String(id) === String(parentId));
-            if (!ok) return EMPTY(page, limit);
+            if (!thanaIdsStr.includes(String(parentId))) return EMPTY(page, limit);
             query.parent = parentId;
           } else {
             query.parent = { $in: thanaIds };
@@ -285,7 +285,6 @@ const update = async (id, reqUser, { name, parent, admins }) => {
     if (!parentArea) throw { statusCode: 400, message: `Parent must be a ${PARENT_TYPE[area.type]}.` };
   }
 
-  // Updates: scope check uses the (possibly new) parent and the existing type.
   await assertWriteScope(reqUser, {
     type: area.type,
     parent: parent !== undefined ? parent : area.parent,

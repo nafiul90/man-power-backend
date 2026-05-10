@@ -6,13 +6,13 @@ const { resolveWardIds } = require('../../utils/geoScope');
 
 const LEVELS = Group.LEVELS;
 
-// Map a geo admin role → (territory key on geoScope, query key on Group)
+// Map a geo admin role → (territoryIds key on geoScope, query key on Group)
 const ROLE_TERRITORY = {
-  'Division Admin': { territoryKey: 'divisionId', queryKey: 'division' },
-  'District Admin': { territoryKey: 'districtId', queryKey: 'district' },
-  'Upazila Admin':  { territoryKey: 'upazilaId',  queryKey: 'upazila'  },
-  'Thana Admin':    { territoryKey: 'thanaId',    queryKey: 'thana'    },
-  'Union Admin':    { territoryKey: 'unionId',    queryKey: 'union'    },
+  'Division Admin': { idsKey: 'divisionIds', queryKey: 'division' },
+  'District Admin': { idsKey: 'districtIds', queryKey: 'district' },
+  'Upazila Admin':  { idsKey: 'upazilaIds',  queryKey: 'upazila'  },
+  'Thana Admin':    { idsKey: 'thanaIds',    queryKey: 'thana'    },
+  'Union Admin':    { idsKey: 'unionIds',    queryKey: 'union'    },
 };
 
 /**
@@ -34,10 +34,11 @@ const buildGeoScopeConstraint = async (reqUser) => {
   }
 
   if (ROLE_TERRITORY[role]) {
-    const { territoryKey, queryKey } = ROLE_TERRITORY[role];
-    if (!geoScope?.[territoryKey]) return false;
+    const { idsKey, queryKey } = ROLE_TERRITORY[role];
+    const territoryIds = geoScope?.[idsKey] ?? [];
+    if (!territoryIds.length) return false;
     const wardIds = await resolveWardIds(reqUser);
-    const or = [{ [queryKey]: geoScope[territoryKey] }];
+    const or = [{ [queryKey]: { $in: territoryIds } }];
     if (wardIds && wardIds.length) or.push({ ward: { $in: wardIds } });
     return { $or: or };
   }
@@ -97,8 +98,9 @@ const resolveAncestry = async ({ level, division, district, upazila, thana, unio
 const assertAncestryInScope = (reqUser, ancestry) => {
   const { role, geoScope } = reqUser;
   if (ROLE_TERRITORY[role]) {
-    const { territoryKey, queryKey } = ROLE_TERRITORY[role];
-    if (String(ancestry[queryKey]) !== String(geoScope?.[territoryKey])) {
+    const { idsKey, queryKey } = ROLE_TERRITORY[role];
+    const territoryIds = (geoScope?.[idsKey] ?? []).map(String);
+    if (!territoryIds.includes(String(ancestry[queryKey]))) {
       throw { statusCode: 403, message: `Group is outside your ${queryKey}.` };
     }
   } else if (role === 'Ward Admin') {

@@ -8,6 +8,7 @@ const loginValidator = [
 const createUserValidator = [
   body('fullName').trim().notEmpty().withMessage('Full name is required.'),
   body('phone').trim().notEmpty().withMessage('Phone is required.'),
+  body('nidNumber').trim().notEmpty().withMessage('NID number is required.'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters.'),
   body('role')
     .optional()
@@ -19,6 +20,7 @@ const createUserValidator = [
 
 const updateUserValidator = [
   body('fullName').optional().trim().notEmpty().withMessage('Full name cannot be empty.'),
+  body('nidNumber').optional().trim().notEmpty().withMessage('NID number cannot be empty.'),
   body('email').optional(),
   body('gender').optional().isIn(['Male', 'Female', 'Other']).withMessage('Invalid gender.'),
   body('role')

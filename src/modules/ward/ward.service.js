@@ -1,13 +1,13 @@
 const Ward = require('./ward.model');
 const { buildOrgFilter } = require('../../utils/scope');
 
-// Map a geo-admin role to (territory key on geoScope, ward field that must match).
+// Map a geo-admin role to (territoryIds key on geoScope, ward field that must match).
 const ROLE_TERRITORY = {
-  'Division Admin': { territoryKey: 'divisionId', wardField: 'division' },
-  'District Admin': { territoryKey: 'districtId', wardField: 'district' },
-  'Upazila Admin':  { territoryKey: 'upazilaId',  wardField: 'upazila'  },
-  'Thana Admin':    { territoryKey: 'thanaId',    wardField: 'thana'    },
-  'Union Admin':    { territoryKey: 'unionId',    wardField: 'union'    },
+  'Division Admin': { idsKey: 'divisionIds', wardField: 'division' },
+  'District Admin': { idsKey: 'districtIds', wardField: 'district' },
+  'Upazila Admin':  { idsKey: 'upazilaIds',  wardField: 'upazila'  },
+  'Thana Admin':    { idsKey: 'thanaIds',    wardField: 'thana'    },
+  'Union Admin':    { idsKey: 'unionIds',    wardField: 'union'    },
 };
 
 const assertWardInScope = (reqUser, ward) => {
@@ -15,8 +15,9 @@ const assertWardInScope = (reqUser, ward) => {
   if (['Super Admin', 'Org Owner', 'Manager'].includes(role)) return;
   const cfg = ROLE_TERRITORY[role];
   if (!cfg) throw { statusCode: 403, message: `${role} cannot manage wards.` };
-  if (!geoScope?.[cfg.territoryKey]) throw { statusCode: 403, message: 'No territory assigned to your account.' };
-  if (String(ward[cfg.wardField]) !== String(geoScope[cfg.territoryKey])) {
+  const territoryIds = (geoScope?.[cfg.idsKey] ?? []).map(String);
+  if (!territoryIds.length) throw { statusCode: 403, message: 'No territory assigned to your account.' };
+  if (!territoryIds.includes(String(ward[cfg.wardField]))) {
     throw { statusCode: 403, message: `Ward is outside your ${cfg.wardField}.` };
   }
 };
@@ -30,31 +31,32 @@ const getAll = async (
   if (search) query.title = { $regex: search, $options: 'i' };
 
   const { role, geoScope } = reqUser;
+  const empty = () => ({ wards: [], total: 0, page: Number(page), pages: 0 });
 
   if (role === 'Ward Admin') {
-    if (!geoScope?.wardIds?.length) return { wards: [], total: 0, page: Number(page), pages: 0 };
+    if (!geoScope?.wardIds?.length) return empty();
     query._id = { $in: geoScope.wardIds };
   } else if (role === 'Union Admin') {
-    if (!geoScope?.unionId) return { wards: [], total: 0, page: Number(page), pages: 0 };
-    query.union = geoScope.unionId;
+    if (!geoScope?.unionIds?.length) return empty();
+    query.union = { $in: geoScope.unionIds };
   } else if (role === 'Thana Admin') {
-    if (!geoScope?.thanaId) return { wards: [], total: 0, page: Number(page), pages: 0 };
-    query.thana = geoScope.thanaId;
+    if (!geoScope?.thanaIds?.length) return empty();
+    query.thana = { $in: geoScope.thanaIds };
     if (union) query.union = union;
   } else if (role === 'Upazila Admin') {
-    if (!geoScope?.upazilaId) return { wards: [], total: 0, page: Number(page), pages: 0 };
-    query.upazila = geoScope.upazilaId;
+    if (!geoScope?.upazilaIds?.length) return empty();
+    query.upazila = { $in: geoScope.upazilaIds };
     if (thana) query.thana = thana;
     if (union) query.union = union;
   } else if (role === 'District Admin') {
-    if (!geoScope?.districtId) return { wards: [], total: 0, page: Number(page), pages: 0 };
-    query.district = geoScope.districtId;
+    if (!geoScope?.districtIds?.length) return empty();
+    query.district = { $in: geoScope.districtIds };
     if (upazila) query.upazila = upazila;
     if (thana) query.thana = thana;
     if (union) query.union = union;
   } else if (role === 'Division Admin') {
-    if (!geoScope?.divisionId) return { wards: [], total: 0, page: Number(page), pages: 0 };
-    query.division = geoScope.divisionId;
+    if (!geoScope?.divisionIds?.length) return empty();
+    query.division = { $in: geoScope.divisionIds };
     if (district) query.district = district;
     if (upazila) query.upazila = upazila;
     if (thana) query.thana = thana;

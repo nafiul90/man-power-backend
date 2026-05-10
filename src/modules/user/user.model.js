@@ -32,6 +32,12 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    nidNumber: {
+      type: String,
+      required: [true, "NID number is required"],
+      unique: true,
+      trim: true,
+    },
     email: {
       type: String,
       sparse: true,
